@@ -7,13 +7,9 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
+  Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger,
 } from "@/components/ui/dialog"
+import { Upload } from 'lucide-react'
 
 export function BulkUpload({ userId }: { userId: string }) {
   const [open, setOpen] = useState(false)
@@ -25,7 +21,6 @@ export function BulkUpload({ userId }: { userId: string }) {
     if (!file) return
 
     setLoading(true)
-    
     const reader = new FileReader()
     reader.onload = async (event) => {
       try {
@@ -33,60 +28,49 @@ export function BulkUpload({ userId }: { userId: string }) {
         const workbook = XLSX.read(bstr, { type: 'binary' })
         const wsname = workbook.SheetNames[0]
         const ws = workbook.Sheets[wsname]
-        
-        // 1. Leemos TODO como una matriz simple (Array de Arrays)
-        // Ejemplo: [ ["Nombre", "Costo"], ["Martillo", 100] ]
         const data = XLSX.utils.sheet_to_json(ws, { header: 1 }) as any[][]
 
         if (data.length < 2) {
-            alert("El archivo parece estar vacío o no tiene datos.")
+            alert("El archivo está vacío.")
             setLoading(false)
             return
         }
 
-        // 2. Analizamos la Fila 0 para encontrar en qué columna está cada dato
         const headerRow = data[0].map((cell: any) => cell.toString().toLowerCase().trim())
-        
-        // Buscamos el índice (posición 0, 1, 2...) de cada columna clave
-        const nameIdx = headerRow.findIndex((h) => h.includes('nombre') || h.includes('producto') || h.includes('name'))
-        const costIdx = headerRow.findIndex((h) => h.includes('costo') || h.includes('precio') || h.includes('cost'))
-        const marginIdx = headerRow.findIndex((h) => h.includes('margen') || h.includes('ganancia') || h.includes('margin'))
-        const stockIdx = headerRow.findIndex((h) => h.includes('stock') || h.includes('cantidad') || h.includes('cant'))
-        const skuIdx = headerRow.findIndex((h) => h.includes('sku') || h.includes('codigo') || h.includes('código'))
+        const nameIdx = headerRow.findIndex((h) => h.includes('nombre') || h.includes('producto'))
+        const costIdx = headerRow.findIndex((h) => h.includes('costo') || h.includes('precio'))
+        const marginIdx = headerRow.findIndex((h) => h.includes('margen'))
+        const stockIdx = headerRow.findIndex((h) => h.includes('stock'))
 
-        // Validación: Si no encontramos la columna de Costo o Nombre, avisamos
         if (nameIdx === -1 || costIdx === -1) {
-            alert(`Error: No encontré las columnas 'Nombre' ni 'Costo'. \nColumnas detectadas: ${headerRow.join(", ")}`)
+            alert("No se encontraron las columnas 'Nombre' y 'Costo'.")
             setLoading(false)
             return
         }
 
-        // 3. Procesamos las filas de datos (empezamos desde la fila 1, saltando los títulos)
         const productsToInsert = data.slice(1).map((row) => {
-            // Si la fila está vacía, la saltamos
             if (!row[nameIdx] && !row[costIdx]) return null
+            
+            // 1. Lógica de Mayúscula Inicial para Excel
+            let rawName = (row[nameIdx] || 'Sin Nombre').toString().trim()
+            const formattedName = rawName.charAt(0).toUpperCase() + rawName.slice(1)
 
             const cost = parseFloat(row[costIdx] || 0)
-            // Si no hay margen, usamos 30% por defecto
             const margin = marginIdx !== -1 ? parseFloat(row[marginIdx] || 30) : 30
             const stock = stockIdx !== -1 ? parseInt(row[stockIdx] || 0) : 0
-            const sku = skuIdx !== -1 ? (row[skuIdx] || '') : ''
-            
             const salePrice = cost * (1 + margin / 100)
             
             return {
                 user_id: userId,
-                name: row[nameIdx] || 'Sin Nombre',
+                name: formattedName, // Nombre corregido
                 cost_price: cost,
                 stock: stock,
                 sale_price: salePrice,
-                sku: sku.toString()
+                sku: ''
             }
-        }).filter(Boolean) // Eliminamos filas nulas
+        }).filter(Boolean)
 
-        // 4. Enviamos a Supabase
         const { error } = await supabase.from('products').insert(productsToInsert)
-
         if (error) throw error
 
         alert(`¡Éxito! Se cargaron ${productsToInsert.length} productos.`)
@@ -94,9 +78,8 @@ export function BulkUpload({ userId }: { userId: string }) {
         router.refresh()
         window.location.reload()
 
-      } catch (error) {
-        console.error("Error:", error)
-        alert("Ocurrió un error inesperado al procesar el Excel.")
+      } catch (error: any) {
+        alert("Error al procesar el archivo: " + error.message)
       } finally {
         setLoading(false)
       }
@@ -107,29 +90,18 @@ export function BulkUpload({ userId }: { userId: string }) {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button variant="secondary" className="bg-green-600 hover:bg-green-700 text-white">
-          📂 Subir Excel
+        <Button className="bg-emerald-600 hover:bg-emerald-700 text-white gap-2 shadow-sm font-medium">
+          <Upload className="h-4 w-4" /> Subir Excel
         </Button>
       </DialogTrigger>
       <DialogContent className="sm:max-w-[425px] bg-white">
         <DialogHeader>
           <DialogTitle>Carga Masiva</DialogTitle>
-          <DialogDescription>
-            El sistema buscará automáticamente las columnas: <b>Nombre, Costo, Margen, Stock</b>.
-          </DialogDescription>
+          <DialogDescription>Selecciona un archivo .xlsx</DialogDescription>
         </DialogHeader>
-        <div className="grid gap-4 py-4">
-          <div className="grid gap-2">
-            <Label htmlFor="file">Seleccionar archivo</Label>
-            <Input 
-                id="file" 
-                type="file" 
-                accept=".xlsx, .xls" 
-                onChange={handleFileUpload}
-                disabled={loading}
-            />
-          </div>
-          {loading && <p className="text-sm text-slate-500 text-center">Leyendo archivo...</p>}
+        <div className="py-4">
+            <Label htmlFor="file">Archivo Excel</Label>
+            <Input id="file" type="file" accept=".xlsx, .xls" onChange={handleFileUpload} disabled={loading} className="mt-2" />
         </div>
       </DialogContent>
     </Dialog>

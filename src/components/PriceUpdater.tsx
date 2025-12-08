@@ -2,17 +2,11 @@
 import { useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { RefreshCw } from 'lucide-react'
 
 export function PriceUpdater({ userId }: { userId: string }) {
   const [open, setOpen] = useState(false)
@@ -22,34 +16,19 @@ export function PriceUpdater({ userId }: { userId: string }) {
 
   const handleUpdate = async () => {
     if (!percentage) return
-    
-    const confirm = window.confirm(`⚠️ ¿Estás seguro de aumentar TODOS tus costos un ${percentage}%?`)
-    if (!confirm) return
+    if (!window.confirm(`⚠️ ¿Aumentar precios un ${percentage}%?`)) return
 
     setLoading(true)
-
     try {
-      // --- CAMBIO AQUÍ: Ya no enviamos target_user_id ---
-      // Solo enviamos el porcentaje. Supabase sabe quién eres.
-      const { error } = await supabase.rpc('update_prices_by_percentage', {
-        percentage: parseFloat(percentage)
-      })
-
-      if (error) {
-        console.error("Error detallado de Supabase:", error)
-        throw error
-      }
-
-      alert(`¡Precios actualizados correctamente!`)
-      setOpen(false)
-      setPercentage('')
+      const { error } = await supabase.rpc('update_prices_by_percentage', { percentage: parseFloat(percentage) })
+      if (error) throw error
+      alert(`¡Precios actualizados!`)
+      setOpen(false); setPercentage('')
       router.refresh()
       window.location.reload()
-
     } catch (error: any) {
-      console.error("Error capturado:", error)
-      // Mostramos el mensaje real del error si existe
-      alert(`Hubo un error: ${error.message || error.details || "Desconocido"}`)
+      // CORRECCIÓN AQUÍ: Usamos alert
+      alert(`Error: ${error.message || "Desconocido"}`)
     } finally {
       setLoading(false)
     }
@@ -58,32 +37,14 @@ export function PriceUpdater({ userId }: { userId: string }) {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button variant="destructive" className="bg-orange-600 hover:bg-orange-700 text-white">
-          📈 Actualizar Precios
+        <Button className="bg-slate-600 hover:bg-slate-700 text-white gap-2 shadow-sm font-medium">
+          <RefreshCw className="h-4 w-4" /> Actualizar Precios
         </Button>
       </DialogTrigger>
       <DialogContent className="sm:max-w-[400px] bg-white">
-        <DialogHeader>
-          <DialogTitle>Actualización Masiva</DialogTitle>
-          <DialogDescription>
-            Ingresa el porcentaje. El sistema calculará automáticamente los nuevos costos y precios de venta.
-          </DialogDescription>
-        </DialogHeader>
-        <div className="grid gap-4 py-4">
-          <div className="grid gap-2">
-            <Label htmlFor="percent">Porcentaje (%)</Label>
-            <Input 
-              id="percent" 
-              type="number" 
-              placeholder="Ej: 10" 
-              value={percentage}
-              onChange={(e) => setPercentage(e.target.value)}
-            />
-          </div>
-        </div>
-        <Button onClick={handleUpdate} disabled={loading || !percentage} className="bg-orange-600 hover:bg-orange-700">
-          {loading ? 'Aplicando...' : 'Aplicar Aumento'}
-        </Button>
+        <DialogHeader><DialogTitle>Actualización Masiva</DialogTitle><DialogDescription>Ajuste porcentual.</DialogDescription></DialogHeader>
+        <div className="py-4"><Label>Porcentaje (%)</Label><Input type="number" placeholder="Ej: 10" value={percentage} onChange={(e) => setPercentage(e.target.value)} className="mt-2" /></div>
+        <Button onClick={handleUpdate} disabled={loading || !percentage} className="w-full bg-slate-800 text-white">{loading ? 'Aplicando...' : 'Aplicar'}</Button>
       </DialogContent>
     </Dialog>
   )
