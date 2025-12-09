@@ -16,6 +16,7 @@ import { AddProductModal } from '@/components/AddProductModal'
 import { BulkUpload } from '@/components/BulkUpload'
 import { PriceUpdater } from '@/components/PriceUpdater'
 import { ExportButton } from '@/components/ExportButton'
+import { SubscriptionGuard } from '@/components/SubscriptionGuard'
 
 export default function Dashboard() {
   const router = useRouter()
@@ -52,6 +53,7 @@ export default function Dashboard() {
   if (loading) return <div className="min-h-screen flex items-center justify-center bg-slate-100 text-slate-500">Cargando...</div>
 
   return (
+    <SubscriptionGuard>
     <div className="min-h-screen bg-slate-50 font-sans text-slate-900 pb-20">
       
       {/* NAVBAR */}
@@ -166,5 +168,6 @@ export default function Dashboard() {
 
       </main>
     </div>
+    </SubscriptionGuard>
   )
 }
