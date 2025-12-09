@@ -2,12 +2,14 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { supabase } from '@/lib/supabase' // Importamos tu cliente
+import { supabase } from '@/lib/supabase' 
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Label } from "@/components/ui/label"
 import { Alert, AlertDescription } from "@/components/ui/alert"
+// 1. IMPORTAMOS EL COMPONENTE
+import { SocialLogin } from "@/components/ui/SocialLogin"
 
 export default function LoginPage() {
   const router = useRouter()
@@ -15,9 +17,8 @@ export default function LoginPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
-  const [mode, setMode] = useState<'login' | 'signup'>('login') // Alternar entre Login y Registro
+  const [mode, setMode] = useState<'login' | 'signup'>('login') 
 
-  // Función principal de autenticación
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
@@ -33,14 +34,12 @@ export default function LoginPage() {
         alert('¡Cuenta creada! Ahora iniciarás sesión automáticamente.')
       } 
       
-      // Intentamos loguearnos (tanto si es login normal o post-registro)
       const { error: loginError } = await supabase.auth.signInWithPassword({
         email,
         password,
       })
       if (loginError) throw loginError
 
-      // Si todo sale bien, vamos al dashboard
       router.push('/dashboard')
       
     } catch (err: any) {
@@ -51,8 +50,8 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="flex items-center justify-center min-h-screen bg-slate-100">
-      <Card className="w-[350px]">
+    <div className="flex items-center justify-center min-h-screen bg-slate-100 p-4">
+      <Card className="w-full max-w-[400px] shadow-lg"> {/* Aumenté un poco el ancho */}
         <CardHeader>
           <CardTitle>{mode === 'login' ? 'Iniciar Sesión' : 'Crear Cuenta'}</CardTitle>
           <CardDescription>
@@ -64,7 +63,6 @@ export default function LoginPage() {
         <CardContent>
           <form onSubmit={handleAuth} className="space-y-4">
             
-            {/* Campo Email */}
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
               <Input 
@@ -77,7 +75,6 @@ export default function LoginPage() {
               />
             </div>
 
-            {/* Campo Password */}
             <div className="space-y-2">
               <Label htmlFor="password">Contraseña</Label>
               <Input 
@@ -89,23 +86,36 @@ export default function LoginPage() {
               />
             </div>
 
-            {/* Mensaje de Error */}
             {error && (
               <Alert variant="destructive">
                 <AlertDescription>{error}</AlertDescription>
               </Alert>
             )}
 
-            <Button type="submit" className="w-full" disabled={loading}>
+            <Button type="submit" className="w-full bg-blue-600 hover:bg-blue-700" disabled={loading}>
               {loading ? 'Cargando...' : (mode === 'login' ? 'Entrar' : 'Registrarse')}
             </Button>
           </form>
 
+          {/* --- SECCIÓN NUEVA: DIVISOR --- */}
+          <div className="relative my-6">
+            <div className="absolute inset-0 flex items-center">
+              <span className="w-full border-t border-slate-200" />
+            </div>
+            <div className="relative flex justify-center text-xs uppercase">
+              <span className="bg-white px-2 text-slate-500">O continúa con</span>
+            </div>
+          </div>
+
+          {/* --- SECCIÓN NUEVA: BOTONES SOCIALES --- */}
+          <SocialLogin />
+
           {/* Toggle Login/Registro */}
-          <div className="mt-4 text-center text-sm">
+          <div className="mt-6 text-center text-sm">
             <p className="text-slate-500">
               {mode === 'login' ? '¿No tienes cuenta? ' : '¿Ya tienes cuenta? '}
               <button 
+                type="button" // Importante poner type button para que no envíe el formulario
                 onClick={() => setMode(mode === 'login' ? 'signup' : 'login')}
                 className="text-blue-600 hover:underline font-medium"
               >

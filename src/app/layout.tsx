@@ -17,7 +17,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="es">
-      {/* AQUI ESTA LA MAGIA PARA QUITAR EL ERROR ROJO */}
+      {/* suppressHydrationWarning ayuda a evitar errores con extensiones del navegador */}
       <body className={inter.className} suppressHydrationWarning={true}>
         {children}
         <Toaster />
