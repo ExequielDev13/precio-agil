@@ -2,7 +2,7 @@
 
 import { supabase } from '@/lib/supabase'
 import { Button } from "@/components/ui/button"
-import { Chrome, Mail } from 'lucide-react' // Usamos Chrome como icono de Google y Mail para Outlook
+import { Chrome, Mail } from 'lucide-react' 
 import { toast } from "sonner"
 
 export function SocialLogin() {
@@ -12,8 +12,11 @@ export function SocialLogin() {
       const { error } = await supabase.auth.signInWithOAuth({
         provider: provider,
         options: {
-          // A dónde redirigir al usuario después de loguearse
-          redirectTo: `${location.origin}/dashboard`, // O la ruta que quieras
+          // --- AQUÍ ESTÁ EL CAMBIO CLAVE ---
+          // Antes: ibas directo a /dashboard
+          // Ahora: vas a /auth/callback y le pasas el parámetro ?next=/dashboard
+          redirectTo: `${location.origin}/auth/callback?next=/dashboard`,
+          
           queryParams: {
             access_type: 'offline',
             prompt: 'consent',
@@ -23,8 +26,6 @@ export function SocialLogin() {
 
       if (error) throw error
       
-      // Nota: OAuth redirige al usuario fuera de tu página, 
-      // así que este toast quizás no se llegue a ver, pero es buena práctica.
     } catch (error: any) {
       toast.error("Error al iniciar sesión: " + error.message)
     }
@@ -32,23 +33,21 @@ export function SocialLogin() {
 
   return (
     <div className="grid gap-3">
-      {/* Botón de Google */}
       <Button 
         variant="outline" 
         onClick={() => handleLogin('google')}
         className="w-full flex items-center gap-2 bg-white text-slate-700 border-slate-300 hover:bg-slate-50"
       >
-        <Chrome className="h-4 w-4 text-red-500" /> {/* Icono simulando Google */}
+        <Chrome className="h-4 w-4 text-red-500" />
         Continuar con Google
       </Button>
 
-      {/* Botón de Microsoft (Outlook/Hotmail) */}
       <Button 
         variant="outline" 
         onClick={() => handleLogin('azure')}
         className="w-full flex items-center gap-2 bg-white text-slate-700 border-slate-300 hover:bg-slate-50"
       >
-        <Mail className="h-4 w-4 text-blue-600" /> {/* Icono simulando Outlook */}
+        <Mail className="h-4 w-4 text-blue-600" />
         Continuar con Outlook
       </Button>
     </div>

@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { UserProfile } from "@/components/ui/UserProfile"
 import { Menu, X } from 'lucide-react'
 import { Button } from "@/components/ui/button"
+import { OnboardingModal } from '@/components/ui/OnboardingModal'
 
 export default function DashboardLayout({
   children,
@@ -84,9 +85,18 @@ export default function DashboardLayout({
         <div className="p-4 md:p-8">
           {children}
         </div>
+return (
+    <div className="flex h-screen bg-slate-50 overflow-hidden">
+      
+      {/* --- AGREGAR ESTO EN CUALQUIER LUGAR (NO VISIBLE) --- */}
+      <OnboardingModal /> 
 
+      {/* ... resto de tu layout (overlay, aside, main, etc.) ... */}
+      
+    </div> )
       </main>
       
     </div>
+    
   )
 }
