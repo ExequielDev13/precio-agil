@@ -1,122 +1,93 @@
 'use client'
+
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
-import { ShieldAlert, CalendarClock } from 'lucide-react'
-import { Button } from '@/components/ui/button'
-import { Skeleton } from '@/components/ui/skeleton'
+import { Button } from "@/components/ui/button"
+import { MessageCircle, ShieldAlert } from 'lucide-react'
+
+// --- TU NÚMERO DE ADMINISTRADOR ---
+const ADMIN_PHONE = "5493815990010" 
 
 export function SubscriptionGuard({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true)
-  const [status, setStatus] = useState<'active' | 'pending' | 'expired'>('pending')
-  const [expiryDate, setExpiryDate] = useState<string | null>(null)
+  const [isAuthorized, setIsAuthorized] = useState(false)
   const router = useRouter()
 
   useEffect(() => {
-    const checkSubscription = async () => {
+    const checkStatus = async () => {
       const { data: { user } } = await supabase.auth.getUser()
+      
       if (!user) {
-        setLoading(false)
+        router.push('/login')
         return
       }
 
-      const { data: profile, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', user.id)
-        .single()
+      // Verificamos si el usuario tiene el campo "approved: true" en sus metadatos
+      // Si quieres probar cómo se ve la pantalla de bloqueo, puedes cambiar esto a 'false' temporalmente
+      const isApproved = user.user_metadata?.approved === true
 
-      if (error || !profile) {
-        setStatus('pending')
-        setLoading(false)
-        return
-      }
-
-      setExpiryDate(profile.subscription_ends_at)
-
-      if (!profile.is_active) {
-        setStatus('pending')
-      } 
-      else if (new Date(profile.subscription_ends_at) < new Date()) {
-        setStatus('expired')
-      } 
-      else {
-        setStatus('active')
-      }
+      setIsAuthorized(isApproved)
       setLoading(false)
     }
 
-    checkSubscription()
-  }, [])
+    checkStatus()
+  }, [router])
 
-  const handleLogout = async () => {
-    await supabase.auth.signOut()
-    router.push('/login')
-  }
-
-  // TU NÚMERO DE WHATSAPP
-  // Formato internacional sin símbolos (+): 549381... o 54381...
-  const whatsappNumber = "543815990010"
-  const message = "Hola, mi suscripción ha vencido y quiero renovarla para seguir usando nexOstock."
-
+  // 1. Cargando...
   if (loading) {
     return (
-      <div className="h-screen flex items-center justify-center bg-slate-50">
-        <Skeleton className="h-12 w-12 rounded-full" />
-      </div>
-    )
-  }
-
-  if (status === 'pending') {
-    return (
-      <div className="h-screen flex flex-col items-center justify-center bg-slate-50 p-6 text-center">
-        <div className="bg-white p-8 rounded-2xl shadow-lg max-w-md border border-slate-200">
-          <div className="bg-blue-100 p-4 rounded-full w-fit mx-auto mb-4">
-            <ShieldAlert className="h-8 w-8 text-blue-600" />
-          </div>
-          <h2 className="text-2xl font-bold text-slate-800 mb-2">Cuenta en Revisión</h2>
-          <p className="text-slate-500 mb-6">
-            Gracias por registrarte. Estamos verificando tu solicitud. 
-            <br/>Te contactaremos para activar tu licencia.
-          </p>
-          <Button onClick={handleLogout} variant="outline">Cerrar Sesión</Button>
+      <div className="flex h-screen items-center justify-center bg-slate-50">
+        <div className="animate-pulse flex flex-col items-center gap-4">
+          <div className="h-12 w-12 bg-slate-200 rounded-full"></div>
+          <div className="h-4 w-32 bg-slate-200 rounded"></div>
         </div>
       </div>
     )
   }
 
-  if (status === 'expired') {
+  // 2. NO AUTORIZADO (Pantalla de Bloqueo con WhatsApp)
+  if (!isAuthorized) {
+    
+    const message = encodeURIComponent("Hola, solicito autorización para acceder a Nexostock.")
+    const whatsappLink = `https://wa.me/${ADMIN_PHONE}?text=${message}`
+
     return (
-      <div className="h-screen flex flex-col items-center justify-center bg-slate-50 p-6 text-center">
-        <div className="bg-white p-8 rounded-2xl shadow-lg max-w-md border border-red-100">
-          <div className="bg-red-100 p-4 rounded-full w-fit mx-auto mb-4">
-            <CalendarClock className="h-8 w-8 text-red-600" />
-          </div>
-          <h2 className="text-2xl font-bold text-slate-800 mb-2">Suscripción Vencida</h2>
-          <p className="text-slate-500 mb-2">
-            Tu licencia expiró el: <b>{new Date(expiryDate!).toLocaleDateString()}</b>
-          </p>
-          <p className="text-sm text-slate-400 mb-6">
-            Tus datos están seguros, pero necesitas renovar para acceder.
-          </p>
+      <div className="flex h-screen flex-col items-center justify-center bg-slate-50 p-4">
+        <div className="w-full max-w-md bg-white p-8 rounded-xl shadow-lg text-center border border-slate-100">
           
-          <div className="space-y-3">
-             {/* BOTÓN DE WHATSAPP CONFIGURADO CON TU NÚMERO */}
-             <Button 
-               className="w-full bg-green-600 hover:bg-green-700 text-white font-bold" 
-               onClick={() => window.open(`https://wa.me/${whatsappNumber}?text=${encodeURIComponent(message)}`, '_blank')}
-             >
-               Renovar por WhatsApp
-             </Button>
-             
-             <Button onClick={handleLogout} variant="ghost" className="text-slate-500">
-               Cerrar Sesión
-             </Button>
+          <div className="mx-auto w-12 h-12 bg-yellow-100 text-yellow-600 rounded-full flex items-center justify-center mb-4">
+            <ShieldAlert className="h-6 w-6" />
           </div>
+
+          <h1 className="text-2xl font-bold text-slate-800 mb-2">
+            Acceso Restringido
+          </h1>
+          
+          <p className="text-slate-600 mb-6">
+            Tu cuenta ha sido creada correctamente, pero requiere 
+            <strong className="text-slate-800"> autorización del administrador</strong> para acceder al sistema.
+          </p>
+
+          <div className="space-y-4">
+            {/* BOTÓN WHATSAPP */}
+            <Button asChild className="w-full bg-[#25D366] hover:bg-[#20bd5a] text-white font-bold gap-2 h-12 text-lg shadow-md transition-all hover:scale-[1.02]">
+              <a href={whatsappLink} target="_blank" rel="noopener noreferrer">
+                <MessageCircle className="h-6 w-6 fill-current" />
+                Solicitar Alta por WhatsApp
+              </a>
+            </Button>
+            
+            <p className="text-xs text-slate-400 mt-4">
+              Una vez autorizado, recarga esta página para ingresar.
+            </p>
+          </div>
+
         </div>
       </div>
     )
   }
 
+  // 3. AUTORIZADO (Muestra el Dashboard)
   return <>{children}</>
 }
