@@ -14,25 +14,31 @@ export function SubscriptionGuard({ children }: { children: React.ReactNode }) {
   const [isAuthorized, setIsAuthorized] = useState(false)
   const router = useRouter()
 
-  useEffect(() => {
-    const checkStatus = async () => {
-      const { data: { user } } = await supabase.auth.getUser()
-      
-      if (!user) {
-        router.push('/login')
-        return
-      }
-
-      // Verificamos si el usuario tiene el campo "approved: true" en sus metadatos
-      // Si quieres probar cómo se ve la pantalla de bloqueo, puedes cambiar esto a 'false' temporalmente
-      const isApproved = user.user_metadata?.approved === true
-
-      setIsAuthorized(isApproved)
-      setLoading(false)
+useEffect(() => {
+  const checkStatus = async () => {
+    // 1. Forzamos a Supabase a traer los datos MÁS NUEVOS del servidor
+    // (Esto ayuda a que no use datos viejos guardados en caché)
+    const { data: { user }, error } = await supabase.auth.getUser()
+    
+    if (error || !user) {
+      router.push('/login')
+      return
     }
 
-    checkStatus()
-  }, [router])
+    // 2. Leemos el metadato (puede venir como true booleano o "true" texto)
+    const approvedVal = user.user_metadata?.approved
+
+    // 3. Verificamos ambas posibilidades
+    const isApproved = approvedVal === true || approvedVal === "true"
+
+    console.log("Estado de aprobación:", isApproved, "(Valor real:", approvedVal, ")") // Para depurar en consola
+
+    setIsAuthorized(isApproved)
+    setLoading(false)
+  }
+
+  checkStatus()
+}, [router])
 
   // 1. Cargando...
   if (loading) {
