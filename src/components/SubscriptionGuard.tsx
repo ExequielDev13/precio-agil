@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 import { Button } from "@/components/ui/button"
-import { MessageCircle, ShieldAlert } from 'lucide-react'
+import { MessageCircle, ShieldAlert, LogOut } from 'lucide-react'
 
 // --- TU NÚMERO DE ADMINISTRADOR ---
 const ADMIN_PHONE = "5493815990010" 
@@ -14,31 +14,33 @@ export function SubscriptionGuard({ children }: { children: React.ReactNode }) {
   const [isAuthorized, setIsAuthorized] = useState(false)
   const router = useRouter()
 
-useEffect(() => {
-  const checkStatus = async () => {
-    // 1. Forzamos a Supabase a traer los datos MÁS NUEVOS del servidor
-    // (Esto ayuda a que no use datos viejos guardados en caché)
-    const { data: { user }, error } = await supabase.auth.getUser()
-    
-    if (error || !user) {
-      router.push('/login')
-      return
-    }
-
-    // 2. Leemos el metadato (puede venir como true booleano o "true" texto)
-    const approvedVal = user.user_metadata?.approved
-
-    // 3. Verificamos ambas posibilidades
-    const isApproved = approvedVal === true || approvedVal === "true"
-
-    console.log("Estado de aprobación:", isApproved, "(Valor real:", approvedVal, ")") // Para depurar en consola
-
-    setIsAuthorized(isApproved)
-    setLoading(false)
+  // Función para cerrar sesión y forzar la actualización de permisos
+  const handleLogout = async () => {
+    await supabase.auth.signOut()
+    router.push('/login')
+    router.refresh()
   }
 
-  checkStatus()
-}, [router])
+  useEffect(() => {
+    const checkStatus = async () => {
+      // Obtenemos los datos frescos del servidor
+      const { data: { user }, error } = await supabase.auth.getUser()
+      
+      if (error || !user) {
+        router.push('/login')
+        return
+      }
+
+      // Verificamos el metadato (acepta true booleano o "true" texto)
+      const approvedVal = user.user_metadata?.approved
+      const isApproved = approvedVal === true || approvedVal === "true"
+
+      setIsAuthorized(isApproved)
+      setLoading(false)
+    }
+
+    checkStatus()
+  }, [router])
 
   // 1. Cargando...
   if (loading) {
@@ -52,7 +54,7 @@ useEffect(() => {
     )
   }
 
-  // 2. NO AUTORIZADO (Pantalla de Bloqueo con WhatsApp)
+  // 2. NO AUTORIZADO (Pantalla de Bloqueo)
   if (!isAuthorized) {
     
     const message = encodeURIComponent("Hola, solicito autorización para acceder a Nexostock.")
@@ -75,18 +77,24 @@ useEffect(() => {
             <strong className="text-slate-800"> autorización del administrador</strong> para acceder al sistema.
           </p>
 
-          <div className="space-y-4">
+          <div className="space-y-3">
             {/* BOTÓN WHATSAPP */}
-            <Button asChild className="w-full bg-[#25D366] hover:bg-[#20bd5a] text-white font-bold gap-2 h-12 text-lg shadow-md transition-all hover:scale-[1.02]">
+            <Button asChild className="w-full bg-[#25D366] hover:bg-[#20bd5a] text-white font-bold gap-2 h-12 text-lg">
               <a href={whatsappLink} target="_blank" rel="noopener noreferrer">
                 <MessageCircle className="h-6 w-6 fill-current" />
                 Solicitar Alta por WhatsApp
               </a>
             </Button>
             
-            <p className="text-xs text-slate-400 mt-4">
-              Una vez autorizado, recarga esta página para ingresar.
-            </p>
+            {/* NUEVO BOTÓN: CERRAR SESIÓN (Para recargar permisos) */}
+            <Button 
+              onClick={handleLogout} 
+              variant="outline" 
+              className="w-full gap-2 border-slate-300 text-slate-600 hover:bg-slate-50"
+            >
+              <LogOut className="h-4 w-4" />
+              Cerrar Sesión (Recargar Permisos)
+            </Button>
           </div>
 
         </div>
@@ -94,6 +102,6 @@ useEffect(() => {
     )
   }
 
-  // 3. AUTORIZADO (Muestra el Dashboard)
+  // 3. AUTORIZADO
   return <>{children}</>
 }
