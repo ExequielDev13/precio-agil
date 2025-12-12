@@ -6,15 +6,16 @@ export default function Home() {
     <div className="flex flex-col items-center justify-center min-h-screen bg-slate-50">
       <div className="text-center space-y-6">
         <h1 className="text-6xl font-bold text-slate-900 tracking-tight">
-          Precio<span className="text-blue-600">Ágil</span>
+          nexO<span className="text-blue-600">stock</span>
         </h1>
-        <p className="text-xl text-slate-600 max-w-md mx-auto">
-          La forma más rápida de gestionar tus listas de precios, actualizar costos y exportar a PDF.
-        </p>
+        <p className="text-xl text-slate-600 max-w-lg mx-auto">
+  Dile adiós a las planillas desordenadas. Centraliza tus productos, proveedores y precios en una plataforma simple, rápida y segura.
+</p>
         
         <div className="pt-4">
           <Link href="/login">
-            <Button size="lg" className="bg-blue-600 hover:bg-blue-700 text-white px-8 text-lg">
+            {/* Eliminamos 'type="submit"' y 'disabled={loading}' */}
+            <Button className="w-full bg-blue-600 hover:bg-blue-700 h-12 px-8 text-lg">
               Ingresar al Sistema →
             </Button>
           </Link>

@@ -1,4 +1,5 @@
 'use client'
+
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { Search, Trash2, PackageOpen, PlusCircle, MinusCircle, Tag, Truck } from 'lucide-react'
@@ -16,8 +17,8 @@ interface Product {
   category: string | null,
   subcategory: string | null,
   supplier: string | null,
-  marca: string | null,        // <--- NUEVO
-  descripcion: string | null,  // <--- NUEVO
+  marca: string | null,        // Campo nuevo
+  descripcion: string | null,  // Campo nuevo
   cost_price: number, 
   sale_price: number, 
   stock: number,
@@ -70,8 +71,8 @@ export function ProductList() {
       toast.success("Productos eliminados correctamente")
     }
   }
-  // ---------------------------
 
+  // --- LÓGICA DE STOCK Y VENTAS ---
   const handleSell = async (product: Product) => {
     if (product.stock <= 0) { toast.error("Sin stock"); return }
     const newStock = product.stock - 1
@@ -108,13 +109,14 @@ export function ProductList() {
 
   useEffect(() => { fetchProducts() }, [])
 
+  // --- FILTRADO ---
   const filtered = products.filter(p => {
     const search = searchTerm.toLowerCase()
     return (
       p.name.toLowerCase().includes(search) || 
       (p.category && p.category.toLowerCase().includes(search)) ||
       (p.supplier && p.supplier.toLowerCase().includes(search)) ||
-      (p.marca && p.marca.toLowerCase().includes(search)) // También buscamos por marca
+      (p.marca && p.marca.toLowerCase().includes(search))
     )
   })
 
@@ -150,6 +152,7 @@ export function ProductList() {
 
       <div className="rounded-xl border border-slate-200 overflow-hidden bg-white shadow-sm">
         <Table>
+          {/* AQUÍ ESTABA EL ERROR: He limpiado los espacios entre TableHead */}
           <TableHeader className="bg-slate-100">
             <TableRow>
               <TableHead className="w-[40px] pl-4">
@@ -160,13 +163,14 @@ export function ProductList() {
                 />
               </TableHead>
               <TableHead className="w-[30%] font-bold text-slate-700">Producto</TableHead>
-              <TableHead className="font-bold text-slate-700">Marca / Detalles</TableHead> {/* NUEVO */}
+              <TableHead className="font-bold text-slate-700">Marca / Detalles</TableHead>
               <TableHead className="text-center font-bold text-slate-700">Stock</TableHead>
               <TableHead className="text-right font-bold text-slate-700">Costo</TableHead>
               <TableHead className="text-right pr-6 font-bold text-slate-700">Venta</TableHead>
               <TableHead className="w-[50px]"></TableHead>
             </TableRow>
           </TableHeader>
+          
           <TableBody>
             {loading ? (
                <TableRow><TableCell colSpan={7} className="h-32 text-center text-slate-400">Cargando...</TableCell></TableRow>

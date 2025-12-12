@@ -64,7 +64,7 @@ export default function Dashboard() {
                     <Package className="h-5 w-5 text-slate-700" />
                 </div>
                 <h1 className="text-xl font-bold text-slate-800">
-                  Precio<span className="text-blue-600">Ágil</span>
+                  nexO<span className="text-blue-600">stock</span>
                 </h1>
              </div>
              <Button onClick={handleLogout} variant="outline" size="sm" className="gap-2 text-slate-600 hover:text-red-600">

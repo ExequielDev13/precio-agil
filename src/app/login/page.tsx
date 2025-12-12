@@ -56,7 +56,7 @@ export default function LoginPage() {
           <CardTitle>{mode === 'login' ? 'Iniciar Sesión' : 'Crear Cuenta'}</CardTitle>
           <CardDescription>
             {mode === 'login' 
-              ? 'Ingresa a PrecioÁgil para gestionar tus listas.' 
+              ? 'Ingresa a nexOstock para gestionar tus listas.' 
               : 'Regístrate gratis para empezar.'}
           </CardDescription>
         </CardHeader>

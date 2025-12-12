@@ -57,7 +57,7 @@ export function SubscriptionGuard({ children }: { children: React.ReactNode }) {
   // TU NÚMERO DE WHATSAPP
   // Formato internacional sin símbolos (+): 549381... o 54381...
   const whatsappNumber = "543815990010"
-  const message = "Hola, mi suscripción ha vencido y quiero renovarla para seguir usando PrecioÁgil."
+  const message = "Hola, mi suscripción ha vencido y quiero renovarla para seguir usando nexOstock."
 
   if (loading) {
     return (
