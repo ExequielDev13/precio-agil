@@ -94,7 +94,7 @@ export default function LoginPage() {
       <Card className="w-full max-w-[450px] shadow-lg">
         <CardHeader>
           <CardTitle className="text-blue-600 text-2xl font-bold text-center">
-             Nexostock 📦
+             nexOstock 📦   
           </CardTitle>
           <CardDescription className="text-center">
             {mode === 'login' 

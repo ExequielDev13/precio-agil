@@ -1,10 +1,12 @@
-import { createServerClient, type CookieOptions } from '@supabase/ssr'
+import { createServerClient } from '@supabase/ssr'
 import { type NextRequest, NextResponse } from 'next/server'
 
 export async function GET(request: NextRequest) {
   const { searchParams, origin } = new URL(request.url)
   const code = searchParams.get('code')
-  // si viene "next", usamos eso para redirigir, si no, al dashboard
+  
+  // Si en el paso 1 pusimos "?next=/dashboard", aquí lo recuperamos.
+  // Si no viene nada, por defecto va a /dashboard.
   const next = searchParams.get('next') ?? '/dashboard'
 
   if (code) {
@@ -27,14 +29,16 @@ export async function GET(request: NextRequest) {
       }
     )
     
-    // Intercambiamos el código por una sesión real
+    // El intercambio mágico: Código -> Sesión
     const { error } = await supabase.auth.exchangeCodeForSession(code)
     
     if (!error) {
+      // Si todo salió bien, redirigimos al usuario a donde quería ir (Dashboard)
+      // Usamos redirect de NextResponse para asegurar que las cookies viajen
       return NextResponse.redirect(`${origin}${next}`)
     }
   }
 
-  // Si algo falla, volvemos al login con error
-  return NextResponse.redirect(`${origin}/auth/auth-code-error`)
+  // Si falla, al login
+  return NextResponse.redirect(`${origin}/login?error=auth`)
 }
