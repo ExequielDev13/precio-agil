@@ -3,19 +3,35 @@
 import { supabaseAdmin } from "@/lib/supabase-admin"
 
 export async function getAllUsers() {
+  console.log("--- INICIANDO GET ALL USERS ---")
+  
+  // 1. Verificamos si la KEY existe (sin mostrarla por seguridad)
+  const hasKey = !!process.env.SUPABASE_SERVICE_ROLE_KEY
+  console.log("¿Existe SUPABASE_SERVICE_ROLE_KEY?:", hasKey ? "SÍ" : "NO ❌")
+
+  if (!hasKey) {
+    console.error("ERROR CRÍTICO: No se encontró la Service Role Key.")
+    return []
+  }
+
   try {
-    // Listar usuarios usando el API de administración de Auth
-    // Esto accede directo a auth.users sin bloqueo de RLS
-    const { data: { users }, error } = await supabaseAdmin.auth.admin.listUsers()
+    // 2. Intentamos pedir los usuarios
+    const { data, error } = await supabaseAdmin.auth.admin.listUsers()
 
     if (error) {
-      console.error("Error fetching users:", error)
+      console.error("❌ Error devuelto por Supabase:", error.message)
       return []
     }
 
-    // Mapeamos los datos para devolver una estructura limpia
-    // Aquí recuperamos los metadatos que guardamos en el Login (Negocio, CUIT, etc)
-    const formattedUsers = users.map(user => ({
+    if (!data || !data.users) {
+      console.warn("⚠️ Supabase no devolvió el objeto 'users'.")
+      return []
+    }
+
+    console.log(`✅ Éxito. Se encontraron ${data.users.length} usuarios brutos.`)
+
+    // 3. Mapeo de datos
+    const formattedUsers = data.users.map(user => ({
       id: user.id,
       email: user.email,
       fullName: user.user_metadata?.full_name || 'Sin nombre',
@@ -29,7 +45,7 @@ export async function getAllUsers() {
     return formattedUsers
 
   } catch (err) {
-    console.error("Server Action Error:", err)
+    console.error("🔥 Error inesperado en el Server Action:", err)
     return []
   }
 }
