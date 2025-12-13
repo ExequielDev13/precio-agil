@@ -6,6 +6,7 @@ import { Menu, X } from 'lucide-react'
 import { Button } from "@/components/ui/button"
 import { OnboardingModal } from '@/components/ui/OnboardingModal'
 
+
 export default function DashboardLayout({
   children,
 }: {
@@ -85,7 +86,7 @@ export default function DashboardLayout({
         <div className="p-4 md:p-8">
           {children}
         </div>
-return (
+
     <div className="flex h-screen bg-slate-50 overflow-hidden">
       
       {/* --- AGREGAR ESTO EN CUALQUIER LUGAR (NO VISIBLE) --- */}
@@ -93,7 +94,7 @@ return (
 
       {/* ... resto de tu layout (overlay, aside, main, etc.) ... */}
       
-    </div> )
+    </div>
       </main>
       
     </div>

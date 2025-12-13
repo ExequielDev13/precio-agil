@@ -4,17 +4,19 @@ import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 import { Button } from "@/components/ui/button"
-import { MessageCircle, ShieldAlert, LogOut } from 'lucide-react'
+import { MessageCircle, ShieldAlert, LogOut, Bug } from 'lucide-react'
 
-// --- TU NÚMERO DE ADMINISTRADOR ---
 const ADMIN_PHONE = "5493815990010" 
 
 export function SubscriptionGuard({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true)
   const [isAuthorized, setIsAuthorized] = useState(false)
+  
+  // VARIABLE DE DEBUG PARA VER EN PANTALLA
+  const [debugData, setDebugData] = useState<any>(null)
+  
   const router = useRouter()
 
-  // Función para cerrar sesión y forzar la actualización de permisos
   const handleLogout = async () => {
     await supabase.auth.signOut()
     router.push('/login')
@@ -23,7 +25,6 @@ export function SubscriptionGuard({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     const checkStatus = async () => {
-      // Obtenemos los datos frescos del servidor
       const { data: { user }, error } = await supabase.auth.getUser()
       
       if (error || !user) {
@@ -31,8 +32,12 @@ export function SubscriptionGuard({ children }: { children: React.ReactNode }) {
         return
       }
 
-      // Verificamos el metadato (acepta true booleano o "true" texto)
+      // Guardamos los datos para mostrarlos en pantalla (Modo Detective)
+      setDebugData(user.user_metadata)
+
+      // Verificamos el metadato
       const approvedVal = user.user_metadata?.approved
+      // Aceptamos true (booleano) o "true" (texto)
       const isApproved = approvedVal === true || approvedVal === "true"
 
       setIsAuthorized(isApproved)
@@ -42,21 +47,11 @@ export function SubscriptionGuard({ children }: { children: React.ReactNode }) {
     checkStatus()
   }, [router])
 
-  // 1. Cargando...
   if (loading) {
-    return (
-      <div className="flex h-screen items-center justify-center bg-slate-50">
-        <div className="animate-pulse flex flex-col items-center gap-4">
-          <div className="h-12 w-12 bg-slate-200 rounded-full"></div>
-          <div className="h-4 w-32 bg-slate-200 rounded"></div>
-        </div>
-      </div>
-    )
+    return <div className="p-10 text-center">Cargando permisos...</div>
   }
 
-  // 2. NO AUTORIZADO (Pantalla de Bloqueo)
   if (!isAuthorized) {
-    
     const message = encodeURIComponent("Hola, solicito autorización para acceder a Nexostock.")
     const whatsappLink = `https://wa.me/${ADMIN_PHONE}?text=${message}`
 
@@ -68,40 +63,35 @@ export function SubscriptionGuard({ children }: { children: React.ReactNode }) {
             <ShieldAlert className="h-6 w-6" />
           </div>
 
-          <h1 className="text-2xl font-bold text-slate-800 mb-2">
-            Acceso Restringido
-          </h1>
-          
-          <p className="text-slate-600 mb-6">
-            Tu cuenta ha sido creada correctamente, pero requiere 
-            <strong className="text-slate-800"> autorización del administrador</strong> para acceder al sistema.
-          </p>
+          <h1 className="text-2xl font-bold text-slate-800 mb-2">Acceso Restringido</h1>
+          <p className="text-slate-600 mb-6">Requiere autorización del administrador.</p>
 
           <div className="space-y-3">
-            {/* BOTÓN WHATSAPP */}
-            <Button asChild className="w-full bg-[#25D366] hover:bg-[#20bd5a] text-white font-bold gap-2 h-12 text-lg">
+            <Button asChild className="w-full bg-[#25D366] hover:bg-[#20bd5a] text-white font-bold gap-2 h-12">
               <a href={whatsappLink} target="_blank" rel="noopener noreferrer">
                 <MessageCircle className="h-6 w-6 fill-current" />
-                Solicitar Alta por WhatsApp
+                Solicitar Alta
               </a>
             </Button>
             
-            {/* NUEVO BOTÓN: CERRAR SESIÓN (Para recargar permisos) */}
-            <Button 
-              onClick={handleLogout} 
-              variant="outline" 
-              className="w-full gap-2 border-slate-300 text-slate-600 hover:bg-slate-50"
-            >
-              <LogOut className="h-4 w-4" />
-              Cerrar Sesión (Recargar Permisos)
+            <Button onClick={handleLogout} variant="outline" className="w-full gap-2">
+              <LogOut className="h-4 w-4" /> Cerrar Sesión
             </Button>
           </div>
+
+          {/* --- ZONA DE DIAGNÓSTICO (ESTO TE DIRÁ EL PROBLEMA) --- */}
+          <div className="mt-8 p-4 bg-slate-100 rounded text-left text-xs font-mono border border-slate-200 overflow-auto max-h-40">
+            <p className="font-bold text-red-600 mb-2 flex items-center gap-2">
+                <Bug className="h-3 w-3"/> DATOS QUE VE EL SISTEMA:
+            </p>
+            <pre>{JSON.stringify(debugData, null, 2)}</pre>
+          </div>
+          {/* ----------------------------------------------------- */}
 
         </div>
       </div>
     )
   }
 
-  // 3. AUTORIZADO
   return <>{children}</>
 }
