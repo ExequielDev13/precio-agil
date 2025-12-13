@@ -1,4 +1,4 @@
-'use client'
+"use client"
 
 import { useState, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
@@ -27,14 +27,17 @@ export default function LoginPage() {
   const [mode, setMode] = useState<'login' | 'signup'>('login')
   const [error, setError] = useState<string | null>(null)
 
-  // Campos Básicos
+  // --- Campos Básicos (Login) ---
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
 
-  // Campos Nuevos (Solo para Registro)
+  // --- Campos Nuevos (Registro Completo) ---
+  const [fullName, setFullName] = useState('')      
+  const [businessName, setBusinessName] = useState('') 
+  const [cuit, setCuit] = useState('') // <--- NUEVO CAMPO
   const [country, setCountry] = useState('')
   const [province, setProvince] = useState('')
-  const [businessType, setBusinessType] = useState('') // Ahora es texto libre
+  const [businessType, setBusinessType] = useState('') 
   const [whatsapp, setWhatsapp] = useState('')
 
   // Obtener provincias según el país seleccionado
@@ -49,9 +52,9 @@ export default function LoginPage() {
 
     try {
       if (mode === 'signup') {
-        // 1. VALIDACIÓN
-        if (!email || !password || !country || !province || !businessType || !whatsapp) {
-          throw new Error("Todos los campos son obligatorios para registrarse.")
+        // 1. VALIDACIÓN COMPLETA (INCLUYE CUIT)
+        if (!email || !password || !country || !province || !businessType || !whatsapp || !fullName || !businessName || !cuit) {
+          throw new Error("Por favor, completa todos los campos (incluyendo CUIT/CUIL).")
         }
 
         // 2. REGISTRO EN SUPABASE
@@ -60,10 +63,12 @@ export default function LoginPage() {
           password,
           options: {
             data: {
-              full_name: email.split('@')[0],
+              full_name: fullName,      
+              business_name: businessName,
+              cuit_cuil: cuit, // <--- Guardamos el CUIT
+              business_type: businessType,
               country,
               province,
-              business_type: businessType, // Se guarda lo que el usuario escribió
               whatsapp,
             },
           },
@@ -91,7 +96,7 @@ export default function LoginPage() {
 
   return (
     <div className="flex items-center justify-center min-h-screen bg-slate-100 p-4">
-      <Card className="w-full max-w-[450px] shadow-lg">
+      <Card className="w-full max-w-[500px] shadow-lg"> 
         <CardHeader>
           <CardTitle className="text-blue-600 text-2xl font-bold text-center">
              nexOstock 📦   
@@ -129,11 +134,54 @@ export default function LoginPage() {
               />
             </div>
 
-            {/* --- CAMPOS SOLO PARA REGISTRO --- */}
+            {/* --- CAMPOS EXTRA QUE SE DESPLIEGAN --- */}
             {mode === 'signup' && (
-              <div className="space-y-4 animate-in fade-in slide-in-from-top-4 duration-300">
+              <div className="space-y-4 animate-in fade-in slide-in-from-top-4 duration-300 pt-2 border-t border-slate-100">
+                
+                {/* 1. DATOS DE IDENTIDAD */}
                 <div className="grid grid-cols-2 gap-4">
-                    {/* PAÍS */}
+                    <div className="space-y-2">
+                        <Label>Tu Nombre Completo</Label>
+                        <Input 
+                            placeholder="Ej: Juan Pérez"
+                            value={fullName}
+                            onChange={(e) => setFullName(e.target.value)}
+                        />
+                    </div>
+                    {/* CUIT / CUIL - CAMPO NUEVO */}
+                    <div className="space-y-2">
+                        <Label>CUIT / CUIL</Label>
+                        <Input 
+                            placeholder="Ej: 20-30405060-8"
+                            value={cuit}
+                            onChange={(e) => setCuit(e.target.value)}
+                        />
+                    </div>
+                </div>
+
+                {/* 2. DATOS DEL NEGOCIO */}
+                <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                        <Label>Nombre del Negocio</Label>
+                        <Input 
+                            placeholder="Ej: Ferretería Norte"
+                            value={businessName}
+                            onChange={(e) => setBusinessName(e.target.value)}
+                        />
+                    </div>
+                    <div className="space-y-2">
+                        <Label>Rubro / Tipo</Label>
+                        <Input 
+                            type="text" 
+                            placeholder="Ej: Veterinaria"
+                            value={businessType}
+                            onChange={(e) => setBusinessType(e.target.value)}
+                        />
+                    </div>
+                </div>
+
+                {/* 3. UBICACIÓN */}
+                <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
                         <Label>País</Label>
                         <Select onValueChange={(val) => { setCountry(val); setProvince(''); }}>
@@ -148,7 +196,6 @@ export default function LoginPage() {
                         </Select>
                     </div>
 
-                    {/* PROVINCIA */}
                     <div className="space-y-2">
                         <Label>Provincia</Label>
                         <Select onValueChange={setProvince} disabled={!country}>
@@ -164,29 +211,17 @@ export default function LoginPage() {
                     </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
-                     {/* TIPO DE NEGOCIO (AHORA ES INPUT LIBRE) */}
-                    <div className="space-y-2">
-                        <Label>Tipo de Negocio</Label>
-                        <Input 
-                            type="text" 
-                            placeholder="Ej: Ferretería"
-                            value={businessType}
-                            onChange={(e) => setBusinessType(e.target.value)}
-                        />
-                    </div>
-
-                    {/* WHATSAPP */}
-                    <div className="space-y-2">
-                        <Label>WhatsApp</Label>
-                        <Input 
-                            type="tel" 
-                            placeholder="+54 9 11..." 
-                            value={whatsapp}
-                            onChange={(e) => setWhatsapp(e.target.value)}
-                        />
-                    </div>
+                {/* 4. CONTACTO */}
+                <div className="space-y-2">
+                    <Label>WhatsApp</Label>
+                    <Input 
+                        type="tel" 
+                        placeholder="+54 9 381..." 
+                        value={whatsapp}
+                        onChange={(e) => setWhatsapp(e.target.value)}
+                    />
                 </div>
+
               </div>
             )}
 
@@ -197,7 +232,7 @@ export default function LoginPage() {
             )}
 
             <Button type="submit" className="w-full bg-blue-600 hover:bg-blue-700 font-bold" disabled={loading}>
-              {loading ? 'Procesando...' : (mode === 'login' ? 'Entrar' : 'Registrar Negocio')}
+              {loading ? 'Procesando...' : (mode === 'login' ? 'Ingresar a nexOstock' : 'Crear Cuenta Gratis')}
             </Button>
           </form>
 
