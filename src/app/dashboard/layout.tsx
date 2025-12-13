@@ -1,11 +1,12 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { supabase } from '@/lib/supabase'
 import { UserProfile } from "@/components/ui/UserProfile"
 import { Menu, X } from 'lucide-react'
 import { Button } from "@/components/ui/button"
 import { OnboardingModal } from '@/components/ui/OnboardingModal'
-
+import { SubscriptionGuard } from "@/components/SubscriptionGuard"
 
 export default function DashboardLayout({
   children,
@@ -13,10 +14,29 @@ export default function DashboardLayout({
   children: React.ReactNode
 }) {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false)
+  const [modules, setModules] = useState<any>({})
+
+  // Cargar configuración de módulos del usuario al iniciar
+  useEffect(() => {
+    const fetchConfig = async () => {
+      const { data: { user } } = await supabase.auth.getUser()
+      
+      if (user?.user_metadata?.modules) {
+        setModules(user.user_metadata.modules)
+      } else {
+        // Por defecto, si no tiene configuración, asumimos que tiene Stock
+        setModules({ stock: true }) 
+      }
+    }
+    fetchConfig()
+  }, [])
 
   return (
     <div className="flex h-screen bg-slate-50 overflow-hidden">
       
+      {/* 1. Componentes Globales (Modal de datos faltantes) */}
+      <OnboardingModal />
+
       {/* --- OVERLAY (Fondo Oscuro para Móvil) --- */}
       {isSidebarOpen && (
         <div 
@@ -35,34 +55,58 @@ export default function DashboardLayout({
         <div>
           {/* Encabezado del Menú */}
           <div className="mb-6 flex justify-between items-center">
-           
+            
             <h2 className="text-2xl font-bold text-black-600 hidden md:block px-2">
               nexO<span className="text-blue-600">stock📦</span>
             </h2>
 
-            
             <span className="text-xl font-bold text-blue-600 md:hidden">Menú</span>
             <Button variant="ghost" size="icon" className="md:hidden" onClick={() => setIsSidebarOpen(false)}>
                <X className="h-5 w-5" />
             </Button>
           </div>
 
+          {/* --- MENÚ DINÁMICO (Basado en Módulos) --- */}
           <nav className="space-y-2">
-            <a 
-              href="/dashboard" 
-              onClick={() => setIsSidebarOpen(false)}
-              className="block px-4 py-2 rounded-lg bg-blue-50 font-medium text-blue-700 hover:bg-blue-100 transition-colors"
-            >
-              Productos
-            </a>
             
-            <a 
-              href="#" 
-              onClick={() => setIsSidebarOpen(false)}
-              className="block px-4 py-2 rounded-lg hover:bg-slate-50 font-medium text-slate-600 transition-colors"
-            >
-              Ventas (Pronto)
-            </a>
+            {/* Módulo STOCK (Por defecto siempre visible o chequeando la flag) */}
+            {(modules.stock !== false) && (
+              <a 
+                href="/dashboard" 
+                onClick={() => setIsSidebarOpen(false)}
+                className="block px-4 py-2 rounded-lg bg-blue-50 font-medium text-blue-700 hover:bg-blue-100 transition-colors"
+              >
+                Productos / Stock
+              </a>
+            )}
+            
+            {/* Módulo VENTAS (Solo si está activo) */}
+            {modules.ventas && (
+              <a 
+                href="/dashboard/ventas" 
+                onClick={() => setIsSidebarOpen(false)}
+                className="block px-4 py-2 rounded-lg hover:bg-slate-50 font-medium text-slate-600 transition-colors"
+              >
+                Ventas
+              </a>
+            )}
+
+            {/* Módulo REPORTES (Solo si está activo) */}
+            {modules.reportes && (
+              <a 
+                href="/dashboard/reportes" 
+                onClick={() => setIsSidebarOpen(false)}
+                className="block px-4 py-2 rounded-lg hover:bg-slate-50 font-medium text-slate-600 transition-colors"
+              >
+                Reportes
+              </a>
+            )}
+
+            {/* Link temporal para que tú entres al Admin (Solo tú lo verás funcionar) */}
+            <div className="pt-4 mt-4 border-t border-slate-100">
+               <a href="/admin" className="text-xs text-slate-400 hover:text-slate-600 px-4">Panel Admin</a>
+            </div>
+
           </nav>
         </div>
 
@@ -76,7 +120,6 @@ export default function DashboardLayout({
         
         {/* --- HEADER MÓVIL --- */}
         <div className="md:hidden flex items-center justify-between p-4 bg-white border-b border-slate-200 mb-4">
-          {/* AQUÍ TAMBIÉN ESTABA EL NOMBRE VIEJO */}
           <span className="font-bold text-blue-600 text-lg">nexOstock</span>
           <Button variant="ghost" size="icon" onClick={() => setIsSidebarOpen(!isSidebarOpen)}>
             <Menu className="h-6 w-6" />
@@ -84,20 +127,14 @@ export default function DashboardLayout({
         </div>
 
         <div className="p-4 md:p-8">
-          {children}
+          {/* EL GUARDIÁN PROTEGE EL CONTENIDO */}
+          <SubscriptionGuard>
+            {children}
+          </SubscriptionGuard>
         </div>
 
-    <div className="flex h-screen bg-slate-50 overflow-hidden">
-      
-      {/* --- AGREGAR ESTO EN CUALQUIER LUGAR (NO VISIBLE) --- */}
-      <OnboardingModal /> 
-
-      {/* ... resto de tu layout (overlay, aside, main, etc.) ... */}
-      
-    </div>
       </main>
       
     </div>
-    
   )
 }

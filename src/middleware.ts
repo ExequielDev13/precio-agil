@@ -1,4 +1,4 @@
-import { createServerClient } from '@supabase/ssr'
+import { createServerClient, type CookieOptions } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
 export async function middleware(request: NextRequest) {
@@ -13,48 +13,51 @@ export async function middleware(request: NextRequest) {
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       cookies: {
-        getAll() {
-          return request.cookies.getAll()
+        get(name: string) {
+          return request.cookies.get(name)?.value
         },
-        setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value, options }) => request.cookies.set(name, value))
+        set(name: string, value: string, options: CookieOptions) {
+          request.cookies.set({ name, value, ...options })
           response = NextResponse.next({
-            request,
+            request: {
+              headers: request.headers,
+            },
           })
-          cookiesToSet.forEach(({ name, value, options }) =>
-            response.cookies.set(name, value, options)
-          )
+          response.cookies.set({ name, value, ...options })
+        },
+        remove(name: string, options: CookieOptions) {
+
+          request.cookies.set({ name, value: '', ...options })
+          response = NextResponse.next({
+            request: {
+              headers: request.headers,
+            },
+          })
+          response.cookies.delete({ name, ...options })
         },
       },
     }
   )
 
-  // Obtenemos al usuario
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  const { data: { user } } = await supabase.auth.getUser()
 
-  // 1. Si NO hay usuario y quiere entrar al dashboard -> Mandarlo al login
+  // 1. PROTECCIÓN DE RUTAS PRIVADAS (Dashboard)
   if (!user && request.nextUrl.pathname.startsWith('/dashboard')) {
     return NextResponse.redirect(new URL('/login', request.url))
   }
 
-  // 2. Si SI hay usuario y quiere entrar al login -> Mandarlo al dashboard
-  if (user && request.nextUrl.pathname === '/login') {
-    return NextResponse.redirect(new URL('/dashboard', request.url))
-  }
-  
-  // 3. Lo mismo para la raíz ('/'), si está logueado -> dashboard
-  if (user && request.nextUrl.pathname === '/') {
-    return NextResponse.redirect(new URL('/dashboard', request.url))
+  // 2. PROTECCIÓN DEL SUPER ADMIN (La parte importante para ti)
+  if (request.nextUrl.pathname.startsWith('/admin')) {
+    // Si no es usuario, o si su rol no es 'superadmin', lo echamos
+    if (!user || user.user_metadata?.role !== 'superadmin') {
+      return NextResponse.redirect(new URL('/dashboard', request.url))
+    }
   }
 
   return response
 }
 
 export const config = {
-  // Aquí le decimos en qué rutas debe funcionar el middleware
-  // Excluimos archivos estáticos, imágenes, favicon, etc. para no hacerlo lento
   matcher: [
     '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
   ],
