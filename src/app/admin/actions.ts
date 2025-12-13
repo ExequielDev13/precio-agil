@@ -3,10 +3,10 @@
 import { createClient } from '@supabase/supabase-js'
 import { revalidatePath } from 'next/cache'
 
-// Creamos el cliente con la LLAVE MAESTRA que acabas de configurar
+// Inicializamos el cliente con la LLAVE MAESTRA
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!, // <--- Esta es la clave nueva
+  process.env.SUPABASE_SERVICE_ROLE_KEY!,
   {
     auth: {
       autoRefreshToken: false,
@@ -28,8 +28,13 @@ export async function getUsers() {
     email: user.email,
     created_at: user.created_at,
     last_sign_in: user.last_sign_in_at,
-    business_type: user.user_metadata?.business_type || 'N/A',
-    whatsapp: user.user_metadata?.whatsapp || 'N/A',
+    // Metadatos extendidos
+    full_name: user.user_metadata?.full_name || '',
+    business_type: user.user_metadata?.business_type || '',
+    whatsapp: user.user_metadata?.whatsapp || '',
+    country: user.user_metadata?.country || '',
+    province: user.user_metadata?.province || '',
+    
     approved: user.user_metadata?.approved === true || user.user_metadata?.approved === 'true',
     role: user.user_metadata?.role || 'user',
     license_expiry: user.user_metadata?.license_expiry || null,
@@ -47,25 +52,36 @@ export async function updateUserConfig(userId: string, data: { approved: boolean
   return { success: true }
 }
 
-// --- FUNCIÓN PARA CONFIGURAR TU CONTRASEÑA ---
-export async function setSuperAdminPassword() {
-  const email = 'exequiel.abraham.13@gmail.com'
-  const newPassword = 'benicio2806'
+// --- NUEVAS FUNCIONES (Las que faltaban y causaban el error) ---
 
-  // 1. Buscamos al usuario
-  const { data: { users } } = await supabaseAdmin.auth.admin.listUsers()
-  const user = users.find(u => u.email === email)
+// 1. Eliminar Usuario
+export async function deleteUser(userId: string) {
+  const { error } = await supabaseAdmin.auth.admin.deleteUser(userId)
+  if (error) throw error
+  revalidatePath('/admin')
+  return { success: true }
+}
 
-  if (!user) {
-    throw new Error(`El usuario ${email} no existe. Por favor regístrate primero en la pantalla de Login.`)
-  }
+// 2. Cambiar Contraseña Manualmente
+export async function adminChangePassword(userId: string, newPassword: string) {
+  const { error } = await supabaseAdmin.auth.admin.updateUserById(userId, {
+    password: newPassword
+  })
+  if (error) throw error
+  revalidatePath('/admin')
+  return { success: true }
+}
 
-  // 2. Le cambiamos la contraseña a la fuerza
-  const { error } = await supabaseAdmin.auth.admin.updateUserById(
-    user.id,
-    { password: newPassword }
-  )
+// 3. Enviar Email de Recuperación
+export async function sendRecoveryEmail(email: string) {
+  // Redirige al dashboard para que al menos entren logueados
+  const redirectTo = process.env.NEXT_PUBLIC_BASE_URL 
+    ? `${process.env.NEXT_PUBLIC_BASE_URL}/dashboard` 
+    : 'http://localhost:3000/dashboard'
 
+  const { error } = await supabaseAdmin.auth.resetPasswordForEmail(email, {
+    redirectTo: redirectTo
+  })
   if (error) throw error
   return { success: true }
 }

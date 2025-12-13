@@ -69,7 +69,7 @@ export default function DashboardLayout({
           {/* --- MENÚ DINÁMICO (Basado en Módulos) --- */}
           <nav className="space-y-2">
             
-            {/* Módulo STOCK (Por defecto siempre visible o chequeando la flag) */}
+            {/* Módulo STOCK */}
             {(modules.stock !== false) && (
               <a 
                 href="/dashboard" 
@@ -102,10 +102,7 @@ export default function DashboardLayout({
               </a>
             )}
 
-            {/* Link temporal para que tú entres al Admin (Solo tú lo verás funcionar) */}
-            <div className="pt-4 mt-4 border-t border-slate-100">
-               <a href="/admin" className="text-xs text-slate-400 hover:text-slate-600 px-4">Panel Admin</a>
-            </div>
+            {/* AQUI YA NO HAY LINK DE ADMIN */}
 
           </nav>
         </div>
