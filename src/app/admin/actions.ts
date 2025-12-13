@@ -1,24 +1,27 @@
 'use server'
 
-import { supabaseAdmin } from "@/lib/supabase-admin" // Asegúrate de tener este archivo configurado
+import { supabaseAdmin } from "@/lib/supabase-admin" 
 import { revalidatePath } from "next/cache"
 
-// --- 1. OBTENER USUARIOS (Para llenar la tabla) ---
+// --- 1. OBTENER USUARIOS (Ahora incluye País y Provincia) ---
 export async function getAllUsers() {
   try {
     const { data: { users }, error } = await supabaseAdmin.auth.admin.listUsers()
     if (error) throw error
 
-    // Mapeamos los datos para devolver una estructura limpia al frontend
     return users.map(user => ({
       id: user.id,
       email: user.email,
-      fullName: user.user_metadata?.full_name || 'Sin nombre',
-      businessName: user.user_metadata?.business_name || 'Sin negocio',
-      cuit: user.user_metadata?.cuit_cuil || '-',
+      fullName: user.user_metadata?.full_name || '',
+      businessName: user.user_metadata?.business_name || '',
+      cuit: user.user_metadata?.cuit_cuil || '',
+      // --- NUEVOS CAMPOS PARA BÚSQUEDA ---
+      country: user.user_metadata?.country || '',
+      province: user.user_metadata?.province || '',
+      // ------------------------------------
       createdAt: user.created_at,
-      licenseEnd: user.user_metadata?.license_end || '', // Fecha vencimiento
-      modules: user.user_metadata?.allowed_modules || [] // Permisos ['stock', 'ventas', etc]
+      licenseEnd: user.user_metadata?.license_end || '', 
+      modules: user.user_metadata?.allowed_modules || [] 
     }))
 
   } catch (err) {
@@ -32,7 +35,7 @@ export async function deleteUser(userId: string) {
   try {
     const { error } = await supabaseAdmin.auth.admin.deleteUser(userId)
     if (error) throw error
-    revalidatePath('/admin') // Recarga la ruta admin
+    revalidatePath('/admin') 
     return { success: true }
   } catch (error: any) {
     return { success: false, error: error.message }

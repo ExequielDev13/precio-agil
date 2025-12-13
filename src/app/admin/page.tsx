@@ -1,7 +1,6 @@
 "use client"
 
 import { useEffect, useState } from "react"
-// Importamos TODO desde el archivo local "action.ts"
 import { 
   getAllUsers, 
   deleteUser, 
@@ -17,16 +16,18 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
-import { Settings, Trash2, Key, Calendar, CheckSquare, X } from "lucide-react"
 import { Checkbox } from "@/components/ui/checkbox"
+// Agregamos el ícono 'Search'
+import { Settings, Trash2, Key, Calendar, CheckSquare, X, Search } from "lucide-react"
 
-// Definición de tipos
 type User = {
   id: string
   email: string
   fullName: string
   businessName: string
   cuit: string
+  country: string   // Nuevo
+  province: string  // Nuevo
   createdAt: string
   licenseEnd?: string 
   modules?: string[]
@@ -36,6 +37,9 @@ export default function AdminUsersPage() {
   const [users, setUsers] = useState<User[]>([])
   const [loading, setLoading] = useState(true)
   
+  // --- ESTADO PARA EL BUSCADOR ---
+  const [searchTerm, setSearchTerm] = useState("")
+
   // Estado del Modal y Formularios
   const [selectedUser, setSelectedUser] = useState<User | null>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
@@ -61,6 +65,19 @@ export default function AdminUsersPage() {
     }
   }
 
+  // --- LÓGICA DE FILTRADO ---
+  const filteredUsers = users.filter(user => {
+    const term = searchTerm.toLowerCase()
+    return (
+      (user.businessName?.toLowerCase() || '').includes(term) ||
+      (user.fullName?.toLowerCase() || '').includes(term) ||
+      (user.email?.toLowerCase() || '').includes(term) ||
+      (user.cuit?.toLowerCase() || '').includes(term) ||
+      (user.province?.toLowerCase() || '').includes(term) ||
+      (user.country?.toLowerCase() || '').includes(term)
+    )
+  })
+
   // --- ABRIR MODAL ---
   const openModal = (user: User) => {
     setSelectedUser(user)
@@ -77,7 +94,7 @@ export default function AdminUsersPage() {
     setIsModalOpen(true)
   }
 
-  // --- HANDLERS (GUARDAR DATOS) ---
+  // --- HANDLERS ---
   const handleSaveProfile = async () => {
     if (!selectedUser) return
     const res = await updateUserProfile(selectedUser.id, formData)
@@ -114,7 +131,6 @@ export default function AdminUsersPage() {
     else alert(res.error)
   }
 
-  // --- CHECKBOX HELPER ---
   const toggleModule = (module: string) => {
     setLicenseData(prev => {
       const exists = prev.modules.includes(module)
@@ -128,35 +144,75 @@ export default function AdminUsersPage() {
   return (
     <div className="p-6 relative">
       <Card>
-        <CardHeader><CardTitle>Panel de Super Admin ({users.length})</CardTitle></CardHeader>
+        <CardHeader>
+          <div className="flex justify-between items-center">
+             <CardTitle>Panel de Super Admin ({users.length})</CardTitle>
+          </div>
+          
+          {/* BARRA DE BÚSQUEDA */}
+          <div className="mt-4 relative">
+             <Search className="absolute left-3 top-3 h-4 w-4 text-slate-400" />
+             <Input 
+                placeholder="Buscar por negocio, nombre, email, CUIT, provincia..." 
+                className="pl-10"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+             />
+          </div>
+        </CardHeader>
+
         <CardContent>
           <Table>
             <TableHeader>
               <TableRow>
                 <TableHead>Negocio</TableHead>
-                <TableHead>Email</TableHead>
+                <TableHead>Responsable</TableHead>
+                <TableHead>Email / CUIT</TableHead>
+                <TableHead>Ubicación</TableHead>
                 <TableHead>Vencimiento</TableHead>
                 <TableHead className="text-right">Acciones</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {users.map((user) => (
-                <TableRow key={user.id}>
-                  <TableCell className="font-bold">{user.businessName}</TableCell>
-                  <TableCell>{user.email}</TableCell>
-                  <TableCell>
-                    {user.licenseEnd 
-                      ? <Badge variant="outline">{user.licenseEnd}</Badge> 
-                      : <span className="text-slate-400 text-sm">--</span>
-                    }
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <Button size="sm" onClick={() => openModal(user)}>
-                      <Settings className="mr-2 h-4 w-4" /> Administrar
-                    </Button>
+              {filteredUsers.length > 0 ? (
+                filteredUsers.map((user) => (
+                  <TableRow key={user.id}>
+                    <TableCell className="font-bold">{user.businessName || 'Sin Nombre'}</TableCell>
+                    
+                    <TableCell>{user.fullName || '-'}</TableCell>
+                    
+                    <TableCell>
+                      <div className="flex flex-col text-sm">
+                        <span>{user.email}</span>
+                        <span className="text-slate-500 text-xs">{user.cuit}</span>
+                      </div>
+                    </TableCell>
+
+                    <TableCell>
+                       {user.province ? `${user.province}, ${user.country}` : '-'}
+                    </TableCell>
+
+                    <TableCell>
+                      {user.licenseEnd 
+                        ? <Badge variant="outline">{user.licenseEnd}</Badge> 
+                        : <span className="text-slate-400 text-sm">--</span>
+                      }
+                    </TableCell>
+                    
+                    <TableCell className="text-right">
+                      <Button size="sm" onClick={() => openModal(user)}>
+                        <Settings className="mr-2 h-4 w-4" /> Administrar
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))
+              ) : (
+                <TableRow>
+                  <TableCell colSpan={6} className="text-center py-8 text-slate-500">
+                    No se encontraron resultados para "{searchTerm}"
                   </TableCell>
                 </TableRow>
-              ))}
+              )}
             </TableBody>
           </Table>
         </CardContent>
