@@ -1,82 +1,111 @@
 'use client'
+
 import { useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'
 import { Button } from "@/components/ui/button"
-import { FileDown } from 'lucide-react'
+import { FileDown, Loader2 } from 'lucide-react'
+import { toast } from "sonner"
 
 export function ExportButton({ userId }: { userId: string }) {
   const [loading, setLoading] = useState(false)
 
-  const handleExport = async () => {
+  const handleExportPDF = async () => {
     setLoading(true)
     try {
-      // 1. Buscamos TODOS los datos del producto
-      const { data: products } = await supabase
+      // 1. Buscamos TODOS los productos del usuario
+      const { data, error } = await supabase
         .from('products')
         .select('*')
         .eq('user_id', userId)
-        .order('category', { ascending: true }) 
-        .order('name', { ascending: true })
+        // Ordenamos por Código de Proveedor para facilitar el control de stock físico
+        .order('supplier_code', { ascending: true })
 
-      if (!products || products.length === 0) {
-        alert("No hay productos para exportar.")
+      if (error) throw error
+
+      if (!data || data.length === 0) {
+        toast.warning("No tienes productos para exportar.")
         setLoading(false)
         return
       }
 
-      // 2. Configuración del PDF
-      const doc = new jsPDF() 
-      
-      // Título y Fecha
+      // 2. Creamos el documento PDF
+      const doc = new jsPDF()
+      const fecha = new Date().toLocaleDateString('es-AR')
+      const hora = new Date().toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })
+
+      // --- ENCABEZADO ---
       doc.setFontSize(18)
-      doc.text("Reporte de Inventario y Precios", 14, 20)
+      doc.setTextColor(40)
+      doc.text("Reporte de Inventario", 14, 22)
       
       doc.setFontSize(10)
-      doc.text(`Generado el: ${new Date().toLocaleDateString()} a las ${new Date().toLocaleTimeString()}`, 14, 28)
+      doc.setTextColor(100)
+      doc.text(`Fecha: ${fecha} - ${hora}`, 14, 28)
+      doc.text("Generado por: nexOstock", 14, 32)
 
-      // 3. Definir las Columnas (INCLUYE MARCA Y DESCRIPCION)
-      const tableColumn = ["Producto", "Marca", "Rubro / Sub", "Descripción", "Stock", "Precio"]
+      // 3. Definimos las Columnas (Ahora incluyen los datos nuevos)
+      const tableColumn = [
+        "Cód. Prov", 
+        "Cód. Int",
+        "Marca", 
+        "Descripción / Detalle", 
+        "Rubro", 
+        "Stock", 
+        "Precio Venta"
+      ]
 
-      // 4. Mapear los datos a filas
-      const tableRows = products.map(p => {
-        const rubroCompleto = p.category 
-          ? `${p.category} ${p.subcategory ? '> ' + p.subcategory : ''}` 
-          : '-'
-
+      // 4. Mapeamos los datos de la base a filas de la tabla
+      const tableRows = data.map(product => {
         return [
-          p.name,
-          p.marca || '-',           // <--- NUEVO
-          rubroCompleto,
-          p.descripcion || '-',     // <--- NUEVO
-          p.stock.toString(),
-          `$${p.sale_price.toFixed(2)}`
+          product.supplier_code || '-',              // Cód Proveedor
+          product.sku || '-',                        // Cód Interno
+          product.marca || '-',                      // Marca
+          product.descripcion || '-',                // Descripción
+          product.category || '-',                   // Rubro
+          product.stock.toString(),                  // Stock
+          `$ ${product.sale_price.toLocaleString('es-AR', { minimumFractionDigits: 2 })}` // Precio
         ]
       })
 
-      // 5. Generar la Tabla con AutoTable
+      // 5. Generamos la tabla con autoTable
       autoTable(doc, {
         head: [tableColumn],
         body: tableRows,
-        startY: 35,
+        startY: 40,
         theme: 'grid',
-        headStyles: { fillColor: [41, 128, 185] },
-        styles: { fontSize: 8 }, 
+        styles: {
+          fontSize: 8,
+          cellPadding: 2,
+          valign: 'middle',
+          overflow: 'linebreak' // Permite que el texto largo baje de renglón
+        },
+        headStyles: {
+          fillColor: [41, 128, 185], // Azul Corporativo
+          textColor: 255,
+          fontStyle: 'bold',
+          halign: 'center'
+        },
+        // Ajustamos anchos de columna específicos
         columnStyles: {
-          0: { cellWidth: 40 }, // Producto
-          1: { cellWidth: 25 }, // Marca
-          2: { cellWidth: 35 }, // Rubro
-          3: { cellWidth: 'auto' }, // Descripción (Automático para usar el espacio sobrante)
-          4: { cellWidth: 15, halign: 'center' }, // Stock
-          5: { cellWidth: 20, halign: 'right' }   // Precio
-        }
+          0: { cellWidth: 25, fontStyle: 'bold' }, // Cód Prov
+          1: { cellWidth: 20 }, // Cód Int
+          2: { cellWidth: 25 }, // Marca
+          3: { cellWidth: 'auto' }, // Descripción (ocupa el resto)
+          4: { cellWidth: 20 }, // Rubro
+          5: { cellWidth: 15, halign: 'center', fontStyle: 'bold' }, // Stock
+          6: { cellWidth: 25, halign: 'right' }   // Precio
+        },
       })
 
-      doc.save("inventario_completo.pdf")
+      // 6. Descargar el archivo
+      doc.save(`Inventario_${fecha.replace(/\//g, '-')}.pdf`)
+      toast.success("PDF exportado correctamente")
 
     } catch (error: any) {
-      alert("Error al generar PDF: " + error.message)
+      console.error("Error exportando PDF:", error)
+      toast.error("Hubo un error al generar el reporte.")
     } finally {
       setLoading(false)
     }
@@ -84,13 +113,17 @@ export function ExportButton({ userId }: { userId: string }) {
 
   return (
     <Button 
-        onClick={handleExport} 
-        disabled={loading}
-        variant="outline"
-        className="bg-white hover:bg-slate-50 text-slate-700 border-slate-300 gap-2 font-medium"
+      variant="outline" 
+      onClick={handleExportPDF} 
+      disabled={loading}
+      className="gap-2 text-red-700 border-red-200 hover:bg-red-50 shadow-sm"
     >
-      <FileDown className="h-4 w-4" />
-      {loading ? "Generando..." : "Descargar Lista PDF"}
+      {loading ? (
+        <Loader2 className="h-4 w-4 animate-spin" />
+      ) : (
+        <FileDown className="h-4 w-4" />
+      )}
+      Exportar PDF
     </Button>
   )
 }
