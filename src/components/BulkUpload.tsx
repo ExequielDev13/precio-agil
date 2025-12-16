@@ -1,130 +1,249 @@
 'use client'
+
 import { useState } from 'react'
-import * as XLSX from 'xlsx'
 import { supabase } from '@/lib/supabase'
-import { useRouter } from 'next/navigation'
+import Papa from 'papaparse'
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
-import { Upload } from 'lucide-react'
+import { Upload, FileSpreadsheet, Loader2, Download, HelpCircle, AlertTriangle } from 'lucide-react'
+import { toast } from "sonner"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog"
+import { useRouter } from 'next/navigation'
 
 export function BulkUpload({ userId }: { userId: string }) {
-  const [open, setOpen] = useState(false)
   const [loading, setLoading] = useState(false)
+  const [isOpen, setIsOpen] = useState(false)
   const router = useRouter()
 
-  // Función auxiliar para formatear texto
-  const formatText = (val: any) => {
-    if (!val) return ''
-    const text = val.toString().trim()
-    if (text.length === 0) return ''
-    return text.charAt(0).toUpperCase() + text.slice(1)
+  // --- FUNCIÓN DE DESCARGA AJUSTADA PARA EXCEL ESPAÑOL (PUNTO Y COMA) ---
+  const downloadTemplate = () => {
+    // 1. Cabeceras separadas por PUNTO Y COMA (;)
+    const headers = "COD_PROVEEDOR;MARCA;DESCRIPCION;RUBRO;SUBRUBRO;PROVEEDOR;COSTO;STOCK"
+    
+    // 2. Fila de Ejemplo también con PUNTO Y COMA
+    const example = "REF-991;BOEHRINGER;PIPETA 10KG;FARMACIA;ANTIPULGAS;DISTRIBUIDORA X;1500;10"
+    
+    // 3. Unimos
+    const csvContent = headers + "\n" + example
+    
+    // 4. Blob con BOM para acentos
+    const blob = new Blob(["\uFEFF" + csvContent], { type: 'text/csv;charset=utf-8;' })
+    
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    // Cambiamos el nombre para indicar que es un CSV compatible
+    link.setAttribute('download', 'modelo_inventario.csv')
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
   }
 
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
+  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
     if (!file) return
 
     setLoading(true)
-    const reader = new FileReader()
-    reader.onload = async (event) => {
-      try {
-        const bstr = event.target?.result
-        const workbook = XLSX.read(bstr, { type: 'binary' })
-        const wsname = workbook.SheetNames[0]
-        const ws = workbook.Sheets[wsname]
-        const data = XLSX.utils.sheet_to_json(ws, { header: 1 }) as any[][]
 
-        if (data.length < 2) {
-            alert("El archivo está vacío.")
+    Papa.parse(file, {
+      header: true,
+      skipEmptyLines: true,
+      encoding: "UTF-8", // Forzamos UTF-8 para leer bien acentos
+      // NO definimos 'delimiter'. Dejamos que PapaParse detecte automáticamente 
+      // si es (,) o (;) para que funcione en cualquier PC.
+      complete: async (results) => {
+        const rows = results.data as any[]
+        
+        if (rows.length === 0) {
+            toast.error("El archivo está vacío o no se reconoció el formato.")
             setLoading(false)
             return
         }
 
-        const headerRow = data[0].map((cell: any) => cell.toString().toLowerCase().trim())
-        
-        // Buscamos los índices de las columnas
-        const nameIdx = headerRow.findIndex((h) => h.includes('nombre') || h.includes('producto'))
-        const costIdx = headerRow.findIndex((h) => h.includes('costo') || h.includes('precio'))
-        const marginIdx = headerRow.findIndex((h) => h.includes('margen'))
-        const stockIdx = headerRow.findIndex((h) => h.includes('stock'))
-        
-        // Nuevas columnas opcionales
-        const catIdx = headerRow.findIndex((h) => h.includes('rubro') || h.includes('categoria'))
-        const subcatIdx = headerRow.findIndex((h) => h.includes('subrubro'))
-        const suppIdx = headerRow.findIndex((h) => h.includes('proveedor'))
-
-        if (nameIdx === -1 || costIdx === -1) {
-            alert("Faltan columnas obligatorias: 'Nombre' y 'Costo'.")
-            setLoading(false)
-            return
+        const normalizeRow = (row: any) => {
+            const newRow: any = {};
+            Object.keys(row).forEach(key => {
+                // Quitamos espacios extra y convertimos a mayúsculas
+                // Esto ayuda si el CSV trae comillas o espacios raros por el separador
+                newRow[key.trim().toUpperCase()] = row[key];
+            });
+            return newRow;
         }
 
-        const productsToInsert = data.slice(1).map((row) => {
-            if (!row[nameIdx] && !row[costIdx]) return null
-            
-            // Aplicamos formato a los textos
-            const formattedName = formatText(row[nameIdx])
-            const formattedCategory = catIdx !== -1 ? formatText(row[catIdx]) : ''
-            const formattedSubcategory = subcatIdx !== -1 ? formatText(row[subcatIdx]) : ''
-            const formattedSupplier = suppIdx !== -1 ? formatText(row[suppIdx]) : ''
+        try {
+            let ignoredCount = 0;
 
-            const cost = parseFloat(row[costIdx] || 0)
-            const margin = marginIdx !== -1 ? parseFloat(row[marginIdx] || 30) : 30
-            const stock = stockIdx !== -1 ? parseInt(row[stockIdx] || 0) : 0
-            const salePrice = cost * (1 + margin / 100)
-            
-            return {
-                user_id: userId,
-                name: formattedName,
-                category: formattedCategory,
-                subcategory: formattedSubcategory,
-                supplier: formattedSupplier,
-                cost_price: cost,
-                stock: stock,
-                sale_price: salePrice,
-                sku: '',
-                min_stock: 5,
-                sold_today: 0,
-                last_restock_date: new Date().toISOString()
+            const productsToInsert = rows.map((rawRow) => {
+                const row = normalizeRow(rawRow); 
+
+                const supplierCode = row['COD_PROVEEDOR']?.toString().trim().toUpperCase() || ''
+                const marca = row['MARCA']?.toString().trim().toUpperCase() || ''
+                const descripcion = row['DESCRIPCION']?.toString().trim().toUpperCase() || ''
+                const rubro = row['RUBRO']?.toString().trim().toUpperCase() || '' 
+                const subrubro = row['SUBRUBRO']?.toString().trim().toUpperCase() || '' 
+                const proveedor = row['PROVEEDOR']?.toString().trim().toUpperCase() || ''
+                
+                // Limpieza de números (soporta 1.500,00 o 1500.00)
+                const cleanPrice = (val: any) => {
+                   if (!val) return 0;
+                   const str = val.toString();
+                   // Si hay coma y punto, asumimos formato español (1.000,00) -> removemos puntos, cambiamos coma por punto
+                   if (str.includes(',') && str.includes('.')) {
+                      return parseFloat(str.replace(/\./g, '').replace(',', '.'));
+                   }
+                   // Si solo hay coma, asumimos decimal (150,50) -> cambiamos por punto
+                   if (str.includes(',')) {
+                      return parseFloat(str.replace(',', '.'));
+                   }
+                   return parseFloat(str) || 0;
+                }
+                
+                const costo = cleanPrice(row['COSTO'])
+                const stock = parseInt(row['STOCK']) || 0
+                
+                if (!descripcion && !supplierCode) {
+                    ignoredCount++;
+                    return null;
+                }
+
+                const margenDefault = 30 
+                const precioVenta = costo * (1 + margenDefault / 100)
+                const skuAuto = `COD-${Math.floor(1000 + Math.random() * 9000)}`
+                const dbName = supplierCode || descripcion.slice(0, 50) || "SIN IDENTIFICADOR"
+
+                return {
+                    user_id: userId,
+                    supplier_code: supplierCode,
+                    sku: skuAuto,
+                    name: dbName,
+                    marca: marca,
+                    descripcion: descripcion,
+                    category: rubro,
+                    subcategory: subrubro,
+                    supplier: proveedor,
+                    cost_price: costo,
+                    sale_price: precioVenta,
+                    margin_percentage: margenDefault,
+                    stock: stock,
+                    min_stock: 5,
+                    sold_today: 0,
+                    last_restock_date: new Date().toISOString()
+                }
+            }).filter(Boolean)
+
+            if (productsToInsert.length === 0) {
+                throw new Error("No se encontraron productos válidos. Verifica que las columnas estén separadas correctamente.")
             }
-        }).filter(Boolean)
 
-        const { error } = await supabase.from('products').insert(productsToInsert)
-        if (error) throw error
+            const { error } = await supabase.from('products').insert(productsToInsert)
 
-        alert(`¡Éxito! Se cargaron ${productsToInsert.length} productos.`)
-        setOpen(false)
-        router.refresh()
-        window.location.reload()
+            if (error) throw error
 
-      } catch (error: any) {
-        alert("Error al procesar el archivo: " + error.message)
-      } finally {
+            if (ignoredCount > 0) {
+                toast.warning(`${productsToInsert.length} productos cargados. ${ignoredCount} ignorados.`)
+            } else {
+                toast.success(`¡Éxito! ${productsToInsert.length} productos importados.`)
+            }
+            
+            setIsOpen(false)
+            router.refresh()
+
+        } catch (error: any) {
+            console.error(error)
+            toast.error(`Error: ${error.message}`)
+        } finally {
+            setLoading(false)
+            event.target.value = ''
+        }
+      },
+      error: (error) => {
         setLoading(false)
+        toast.error(`Error al leer archivo: ${error.message}`)
       }
-    }
-    reader.readAsBinaryString(file)
+    })
   }
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogTrigger asChild>
-        <Button className="bg-emerald-600 hover:bg-emerald-700 text-white gap-2 shadow-sm font-medium">
-          <Upload className="h-4 w-4" /> Subir Excel
+        <Button variant="secondary" className="gap-2 shadow-sm border border-slate-200">
+          <FileSpreadsheet className="h-4 w-4 text-green-600" /> 
+          Carga Masiva
         </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-[425px] bg-white">
+      <DialogContent className="sm:max-w-[500px] bg-white">
         <DialogHeader>
-          <DialogTitle>Carga Masiva</DialogTitle>
+          <DialogTitle className="flex items-center gap-2">
+            <Upload className="h-5 w-5" /> Importar Productos
+          </DialogTitle>
           <DialogDescription>
-            Soporta columnas: Nombre, Costo, Margen, Stock, Rubro, Subrubro, Proveedor.
+            El sistema detectará automáticamente si usas Excel (punto y coma) o CSV estándar.
           </DialogDescription>
         </DialogHeader>
-        <div className="py-4">
-            <Label htmlFor="file">Archivo Excel</Label>
-            <Input id="file" type="file" accept=".xlsx, .xls" onChange={handleFileUpload} disabled={loading} className="mt-2" />
+
+        <div className="space-y-6 py-4">
+            
+            <div className="bg-slate-50 p-4 rounded-lg border border-slate-100 text-sm space-y-3">
+                <div className="flex items-start gap-2">
+                    <HelpCircle className="h-4 w-4 text-blue-500 mt-0.5 shrink-0" />
+                    <p className="text-slate-600">
+                        Columnas sugeridas: <b>COD_PROVEEDOR; MARCA; DESCRIPCION; RUBRO; COSTO; STOCK</b>.
+                    </p>
+                </div>
+                
+                <div className="flex items-start gap-2 text-orange-600 text-xs bg-orange-50 p-2 rounded">
+                    <AlertTriangle className="h-3 w-3 mt-0.5 shrink-0" />
+                    <p>
+                        Se recomienda usar <b>Punto y Coma (;)</b> como separador, que es el estándar de Excel en español.
+                    </p>
+                </div>
+
+                <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={downloadTemplate} 
+                    className="w-full gap-2 text-green-700 border-green-200 hover:bg-green-50 shadow-sm font-medium"
+                >
+                    <Download className="h-4 w-4" /> Descargar Modelo Excel (;)
+                </Button>
+            </div>
+
+            <div className="flex justify-center">
+                <label className={`
+                    flex flex-col items-center justify-center w-full h-32 
+                    border-2 border-dashed rounded-lg cursor-pointer 
+                    transition-colors duration-200
+                    ${loading ? 'bg-slate-100 border-slate-300' : 'bg-blue-50/50 border-blue-300 hover:bg-blue-50'}
+                `}>
+                    <div className="flex flex-col items-center justify-center pt-5 pb-6">
+                        {loading ? (
+                            <>
+                                <Loader2 className="h-8 w-8 text-blue-600 animate-spin mb-2" />
+                                <p className="text-sm text-slate-500">Procesando...</p>
+                            </>
+                        ) : (
+                            <>
+                                <Upload className="w-8 h-8 mb-3 text-blue-500" />
+                                <p className="text-sm text-slate-500 font-semibold">Clic para subir archivo</p>
+                                <p className="text-xs text-slate-400">Excel o CSV</p>
+                            </>
+                        )}
+                    </div>
+                    <input 
+                        type="file" 
+                        className="hidden" 
+                        accept=".csv" 
+                        onChange={handleFileUpload} 
+                        disabled={loading}
+                    />
+                </label>
+            </div>
         </div>
       </DialogContent>
     </Dialog>

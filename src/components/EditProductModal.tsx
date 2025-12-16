@@ -1,42 +1,76 @@
 'use client'
 import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
-import { useRouter } from 'next/navigation'
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Plus, Loader2, RefreshCw, Wand2 } from 'lucide-react'
+import { Loader2, Lock, Save } from 'lucide-react' // Icono Lock para mostrar que está bloqueado
 import { toast } from "sonner"
 
-export function AddProductModal({ userId }: { userId: string }) {
-  const [open, setOpen] = useState(false)
-  const router = useRouter()
+// Definimos la interfaz del producto para recibirlo
+interface Product {
+  id: string
+  sku: string | null
+  supplier_code: string | null
+  name: string
+  category: string | null
+  subcategory: string | null
+  supplier: string | null
+  marca: string | null
+  descripcion: string | null
+  cost_price: number
+  sale_price: number
+  stock: number
+  min_stock: number
+  margin_percentage?: number
+}
+
+interface Props {
+  product: Product | null
+  isOpen: boolean
+  onClose: () => void
+  onUpdate: () => void // Para recargar la lista al terminar
+}
+
+export function EditProductModal({ product, isOpen, onClose, onUpdate }: Props) {
   const [loading, setLoading] = useState(false)
-  
-  // Estados del Formulario (YA NO HAY NAME)
-  const [sku, setSku] = useState('')           
+
+  // Estados
+  const [sku, setSku] = useState('')
   const [supplierCode, setSupplierCode] = useState('')
-  // const [name, setName] = useState('') <--- ELIMINADO
-  
   const [category, setCategory] = useState('')
   const [subcategory, setSubcategory] = useState('')
   const [supplier, setSupplier] = useState('')
-  const [marca, setMarca] = useState('')       
+  const [marca, setMarca] = useState('')
   const [descripcion, setDescripcion] = useState('')
   const [cost, setCost] = useState('')
   const [margin, setMargin] = useState('30')
   const [stock, setStock] = useState('0')
   const [minStock, setMinStock] = useState('5')
 
-  const generateSKU = () => {
-    const simpleNum = Math.floor(1000 + Math.random() * 9000);
-    setSku(`COD-${simpleNum}`);
-  }
-
+  // Cargar datos cuando se abre el modal
   useEffect(() => {
-    if (open && !sku) { generateSKU(); }
-  }, [open])
+    if (product && isOpen) {
+      setSku(product.sku || '')
+      setSupplierCode(product.supplier_code || '')
+      setCategory(product.category || '')
+      setSubcategory(product.subcategory || '')
+      setSupplier(product.supplier || '')
+      setMarca(product.marca || '')
+      setDescripcion(product.descripcion || '')
+      setCost(product.cost_price.toString())
+      setStock(product.stock.toString())
+      setMinStock(product.min_stock.toString())
+      
+      // Calcular margen inverso basado en precio de venta y costo
+      // Margen = ((PrecioVenta / Costo) - 1) * 100
+      if (product.cost_price > 0) {
+        const calculatedMargin = ((product.sale_price / product.cost_price) - 1) * 100
+        setMargin(calculatedMargin.toFixed(2)) // Redondeamos
+      }
+    }
+  }, [product, isOpen])
 
   const formatTitle = (text: string) => {
     if (!text) return ''
@@ -44,21 +78,19 @@ export function AddProductModal({ userId }: { userId: string }) {
     return clean.charAt(0).toUpperCase() + clean.slice(1)
   }
 
-  const handleSave = async () => {
+  const handleUpdate = async () => {
+    if (!product) return
     setLoading(true)
-    
+
     // Formateos
     const cleanCategory = formatTitle(category)
     const cleanSubcategory = formatTitle(subcategory)
-
-    const finalSku = sku.toUpperCase().trim()
     const finalSupplierCode = supplierCode.toUpperCase().trim()
     const finalMarca = marca.toUpperCase().trim()
     const finalSupplier = supplier.toUpperCase().trim()
     const finalDescripcion = descripcion.toUpperCase().trim()
 
-    // TRUCO: Como la BD necesita un 'name', usaremos el Cód. Proveedor como "Nombre" interno
-    // Si no hay cód proveedor, usamos la descripción truncada.
+    // Lógica de Nombre (mismo fallback que en creación)
     const dbNameFallback = finalSupplierCode || finalDescripcion.slice(0, 50) || "SIN NOMBRE";
 
     const costNumber = parseFloat(cost)
@@ -66,11 +98,9 @@ export function AddProductModal({ userId }: { userId: string }) {
     const calculatedSalePrice = costNumber * (1 + marginNumber / 100)
 
     try {
-      const { error } = await supabase.from('products').insert({
-        user_id: userId,
-        sku: finalSku,                     
-        supplier_code: finalSupplierCode,  
-        name: dbNameFallback,         // <--- Guardamos esto para cumplir con la BD
+      const { error } = await supabase.from('products').update({
+        supplier_code: finalSupplierCode,
+        name: dbNameFallback,
         category: cleanCategory,
         subcategory: cleanSubcategory,
         supplier: finalSupplier,
@@ -80,104 +110,74 @@ export function AddProductModal({ userId }: { userId: string }) {
         sale_price: calculatedSalePrice,
         stock: parseInt(stock),
         min_stock: parseInt(minStock),
-        last_restock_date: new Date().toISOString(),
-        sold_today: 0,
-      })
+        // NO actualizamos 'sku' ni 'created_at' ni 'user_id'
+      }).eq('id', product.id)
 
       if (error) throw error
 
-      setOpen(false)
-      toast.success(`Producto creado (Prov: ${finalSupplierCode})`)
-      
-      // Resetear
-      setCategory(''); setSubcategory(''); setSupplier(''); 
-      setMarca(''); setDescripcion(''); setSupplierCode('');
-      setCost(''); setStock('0'); setMinStock('5'); 
-      setSku('');
-      
-      router.refresh()
-      
+      toast.success("Producto actualizado correctamente")
+      onUpdate() // Avisamos al padre que recargue
+      onClose()  // Cerramos
+
     } catch (error: any) {
       console.error(error)
-      toast.error('Error: ' + error.message)
+      toast.error('Error al actualizar: ' + error.message)
     } finally {
       setLoading(false)
     }
   }
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button className="bg-blue-600 hover:bg-blue-700 text-white gap-2 shadow-sm font-medium">
-          <Plus className="h-4 w-4" /> Nuevo Producto
-        </Button>
-      </DialogTrigger>
+    <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="sm:max-w-[650px] bg-white max-h-[90vh] overflow-y-auto">
-        <DialogHeader><DialogTitle>Nuevo Producto</DialogTitle></DialogHeader>
+        <DialogHeader><DialogTitle>Editar Producto</DialogTitle></DialogHeader>
         <div className="grid gap-5 py-4">
           
-          {/* SECCIÓN CÓDIGOS */}
+          {/* CÓDIGOS */}
           <div className="grid grid-cols-2 gap-4 bg-slate-50 p-4 rounded-lg border border-slate-100">
+             
+             {/* CÓDIGO INTERNO (BLOQUEADO) */}
              <div className="grid gap-2">
-                <Label className="text-xs font-bold text-slate-500 uppercase flex items-center gap-2">
-                    Código Interno <Wand2 className="h-3 w-3 text-blue-500"/>
+                <Label className="text-xs font-bold text-slate-400 uppercase flex items-center gap-2">
+                    Código Interno <Lock className="h-3 w-3"/>
                 </Label>
-                <div className="flex gap-2">
-                    <Input 
-                        value={sku} 
-                        onChange={(e) => setSku(e.target.value.toUpperCase())} 
-                        className="bg-white font-mono font-bold text-blue-700 text-lg border-blue-200 tracking-wider" 
-                    />
-                    <Button variant="outline" size="icon" onClick={generateSKU} title="Generar otro">
-                        <RefreshCw className="h-4 w-4 text-slate-500" />
-                    </Button>
-                </div>
+                <Input 
+                    value={sku} 
+                    disabled // <--- ESTO LO BLOQUEA
+                    className="bg-slate-200 font-mono font-bold text-slate-500 border-slate-300 cursor-not-allowed" 
+                />
              </div>
 
              <div className="grid gap-2">
-                <Label className="text-xs font-bold text-slate-500 uppercase">Cód. Proveedor <span className="text-red-500">*</span></Label>
+                <Label className="text-xs font-bold text-slate-500 uppercase">Cód. Proveedor</Label>
                 <Input 
                     value={supplierCode} 
                     onChange={(e) => setSupplierCode(e.target.value.toUpperCase())} 
-                    placeholder="Ej: REF-9988" 
-                    className="bg-white placeholder:normal-case font-bold text-lg"
-                    autoFocus
+                    className="bg-white font-bold"
                 />
              </div>
           </div>
 
-          {/* MARCA Y PROVEEDOR */}
           <div className="grid grid-cols-2 gap-4">
              <div className="grid gap-2">
                 <Label>Marca</Label>
-                <Input 
-                    value={marca} 
-                    onChange={(e) => setMarca(e.target.value.toUpperCase())} 
-                    placeholder="BOEHRINGER" 
-                />
+                <Input value={marca} onChange={(e) => setMarca(e.target.value.toUpperCase())} />
              </div>
              <div className="grid gap-2">
                 <Label>Proveedor</Label>
-                <Input 
-                    value={supplier} 
-                    onChange={(e) => setSupplier(e.target.value.toUpperCase())} 
-                    placeholder="DISTRIBUIDORA X" 
-                />
+                <Input value={supplier} onChange={(e) => setSupplier(e.target.value.toUpperCase())} />
              </div>
           </div>
 
-          {/* DESCRIPCIÓN (OBLIGATORIA AHORA PARA IDENTIFICAR) */}
           <div className="grid gap-2">
-             <Label>Descripción / Detalles <span className="text-red-500">*</span></Label>
+             <Label>Descripción / Detalles</Label>
              <textarea 
                 className="flex w-full rounded-md border border-slate-200 bg-transparent px-3 py-2 text-sm shadow-sm placeholder:text-slate-500 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-slate-950 min-h-[80px] resize-none uppercase"
                 value={descripcion} 
                 onChange={(e) => setDescripcion(e.target.value.toUpperCase())} 
-                placeholder="DETALLES TÉCNICOS, PRODUCTO, PESO, ETC..." 
              />
           </div>
 
-          {/* RUBROS */}
           <div className="grid grid-cols-2 gap-4">
             <div className="grid gap-2"><Label>Rubro</Label><Input value={category} onChange={(e) => setCategory(e.target.value)} /></div>
             <div className="grid gap-2"><Label>Subrubro</Label><Input value={subcategory} onChange={(e) => setSubcategory(e.target.value)} /></div>
@@ -185,9 +185,8 @@ export function AddProductModal({ userId }: { userId: string }) {
 
           <div className="h-px bg-slate-100 my-2"></div>
 
-          {/* PRECIOS */}
           <div className="grid grid-cols-3 gap-4">
-            <div className="grid gap-2"><Label>Costo ($) <span className="text-red-500">*</span></Label><Input type="number" value={cost} onChange={(e) => setCost(e.target.value)} /></div>
+            <div className="grid gap-2"><Label>Costo ($)</Label><Input type="number" value={cost} onChange={(e) => setCost(e.target.value)} /></div>
             <div className="grid gap-2"><Label>Margen (%)</Label><Input type="number" value={margin} onChange={(e) => setMargin(e.target.value)} /></div>
             <div className="grid gap-2">
                <Label className="text-blue-600 font-bold">Precio Final</Label>
@@ -198,16 +197,18 @@ export function AddProductModal({ userId }: { userId: string }) {
           </div>
 
           <div className="grid grid-cols-2 gap-4">
-            <div className="grid gap-2"><Label>Stock Inicial</Label><Input type="number" value={stock} onChange={(e) => setStock(e.target.value)} /></div>
+            <div className="grid gap-2"><Label>Stock Actual</Label><Input type="number" value={stock} onChange={(e) => setStock(e.target.value)} /></div>
             <div className="grid gap-2"><Label>Alerta Mínima</Label><Input type="number" value={minStock} onChange={(e) => setMinStock(e.target.value)} /></div>
           </div>
 
         </div>
         
-        {/* Validación: Requiere Código Prov O Descripción */}
-        <Button onClick={handleSave} disabled={loading || (!supplierCode && !descripcion) || !cost} className="w-full bg-blue-600 hover:bg-blue-700 text-white text-lg h-12">
-          {loading ? <><Loader2 className="mr-2 h-5 w-5 animate-spin" /> Guardando...</> : 'Guardar Producto'}
-        </Button>
+        <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={onClose}>Cancelar</Button>
+            <Button onClick={handleUpdate} disabled={loading || !cost} className="bg-blue-600 hover:bg-blue-700 text-white min-w-[150px]">
+            {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <><Save className="mr-2 h-4 w-4"/> Guardar Cambios</>}
+            </Button>
+        </div>
       </DialogContent>
     </Dialog>
   )
