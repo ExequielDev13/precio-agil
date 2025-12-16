@@ -6,7 +6,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { RefreshCw, Filter } from 'lucide-react'
+import { RefreshCw, Filter, Loader2 } from 'lucide-react'
+import { toast } from "sonner" // <--- Usamos las notificaciones lindas
 
 // Componente de Selección Simple
 const Select = ({ label, options, value, onChange }: any) => (
@@ -59,7 +60,7 @@ export function PriceUpdater({ userId }: { userId: string }) {
     if (!percentage) return
     
     // Mensaje de confirmación detallado
-    let msg = `⚠️ ¿Aumentar un ${percentage}%`
+    let msg = `⚠️ ¿Confirmas aumentar un ${percentage}%`
     if (selectedCategory) msg += ` al rubro "${selectedCategory}"`
     if (selectedSupplier) msg += ` del proveedor "${selectedSupplier}"`
     if (!selectedCategory && !selectedSupplier) msg += ` a TODOS los productos`
@@ -69,7 +70,7 @@ export function PriceUpdater({ userId }: { userId: string }) {
 
     setLoading(true)
     try {
-      // Llamada a la nueva función SQL con filtros
+      // Llamada a la función RPC SQL (Asegúrate de haberla creado en Supabase)
       const { error } = await supabase.rpc('update_prices_by_percentage', {
         percentage: parseFloat(percentage),
         filter_category: selectedCategory || null,
@@ -78,15 +79,18 @@ export function PriceUpdater({ userId }: { userId: string }) {
 
       if (error) throw error
 
-      alert(`¡Precios actualizados correctamente!`)
+      toast.success(`✅ Precios actualizados un ${percentage}% correctamente`)
+      
       setOpen(false)
       setPercentage('')
       setSelectedCategory('')
       setSelectedSupplier('')
-      router.refresh()
-      window.location.reload()
+      
+      router.refresh() // Actualiza la vista sin recargar la página
+
     } catch (error: any) {
-      alert(`Error: ${error.message}`)
+      console.error(error)
+      toast.error(`Error al actualizar: ${error.message}`)
     } finally {
       setLoading(false)
     }
@@ -95,7 +99,7 @@ export function PriceUpdater({ userId }: { userId: string }) {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button className="bg-slate-600 hover:bg-slate-700 text-white gap-2 shadow-sm font-medium">
+        <Button className="bg-slate-800 hover:bg-slate-900 text-white gap-2 shadow-sm font-medium">
           <RefreshCw className="h-4 w-4" /> Actualizar Precios
         </Button>
       </DialogTrigger>
@@ -107,7 +111,7 @@ export function PriceUpdater({ userId }: { userId: string }) {
         
         <div className="grid gap-4 py-4">
           <div className="bg-blue-50 p-3 rounded-md border border-blue-100 text-sm text-blue-800 flex gap-2">
-            <Filter className="h-4 w-4 mt-0.5" />
+            <Filter className="h-4 w-4 mt-0.5 shrink-0" />
             <p>Puedes filtrar a qué productos aplicar el aumento. Si dejas "Todos", se aplicará a todo el inventario.</p>
           </div>
 
@@ -138,8 +142,12 @@ export function PriceUpdater({ userId }: { userId: string }) {
           </div>
         </div>
 
-        <Button onClick={handleUpdate} disabled={loading || !percentage} className="w-full bg-slate-800 hover:bg-slate-900 text-white">
-          {loading ? 'Aplicando...' : 'Aplicar Aumento'}
+        <Button onClick={handleUpdate} disabled={loading || !percentage} className="w-full bg-slate-900 hover:bg-black text-white">
+          {loading ? (
+            <> <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Procesando... </>
+          ) : (
+            'Aplicar Aumento'
+          )}
         </Button>
       </DialogContent>
     </Dialog>

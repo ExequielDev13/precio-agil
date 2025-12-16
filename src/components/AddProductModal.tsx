@@ -6,7 +6,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Plus } from 'lucide-react'
+import { Plus, Loader2 } from 'lucide-react'
+import { toast } from "sonner" // <--- IMPORTANTE: Usamos Sonner para alertas lindas
 
 export function AddProductModal({ userId }: { userId: string }) {
   const [open, setOpen] = useState(false)
@@ -18,8 +19,8 @@ export function AddProductModal({ userId }: { userId: string }) {
   const [category, setCategory] = useState('')
   const [subcategory, setSubcategory] = useState('')
   const [supplier, setSupplier] = useState('')
-  const [marca, setMarca] = useState('')           // <--- NUEVO
-  const [descripcion, setDescripcion] = useState('') // <--- NUEVO
+  const [marca, setMarca] = useState('')       
+  const [descripcion, setDescripcion] = useState('')
   const [cost, setCost] = useState('')
   const [margin, setMargin] = useState('30')
   const [stock, setStock] = useState('0')
@@ -39,7 +40,7 @@ export function AddProductModal({ userId }: { userId: string }) {
     const cleanCategory = formatText(category)
     const cleanSubcategory = formatText(subcategory)
     const cleanSupplier = formatText(supplier)
-    const cleanMarca = formatText(marca) // <--- Formateamos marca
+    const cleanMarca = formatText(marca)
 
     const costNumber = parseFloat(cost)
     const marginNumber = parseFloat(margin)
@@ -52,8 +53,8 @@ export function AddProductModal({ userId }: { userId: string }) {
         category: cleanCategory,
         subcategory: cleanSubcategory,
         supplier: cleanSupplier,
-        marca: cleanMarca,            // <--- ENVIAMOS A SUPABASE
-        descripcion: descripcion,     // <--- ENVIAMOS A SUPABASE
+        marca: cleanMarca,
+        descripcion: descripcion,
         cost_price: costNumber,
         sale_price: calculatedSalePrice,
         stock: parseInt(stock),
@@ -66,15 +67,19 @@ export function AddProductModal({ userId }: { userId: string }) {
       if (error) throw error
 
       setOpen(false)
+      toast.success("Producto creado exitosamente") // <--- Feedback visual elegante
+      
       // Resetear formulario
       setName(''); setCategory(''); setSubcategory(''); setSupplier(''); 
-      setMarca(''); setDescripcion(''); // <--- Reset nuevos
+      setMarca(''); setDescripcion('');
       setCost(''); setStock('0'); setMinStock('5')
       
       router.refresh()
-      window.location.reload()
+      // window.location.reload() // <--- Lo quitamos para que sea más fluido y se vea el Toast
+      
     } catch (error: any) {
-      alert('Error: ' + error.message)
+      console.error(error)
+      toast.error('Error al guardar: ' + error.message)
     } finally {
       setLoading(false)
     }
@@ -92,7 +97,7 @@ export function AddProductModal({ userId }: { userId: string }) {
         <div className="grid gap-4 py-4">
           
           <div className="grid gap-2">
-            <Label>Nombre del Producto</Label>
+            <Label>Nombre del Producto <span className="text-red-500">*</span></Label>
             <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Ej: Pipeta Frontline 10kg" />
           </div>
 
@@ -111,11 +116,11 @@ export function AddProductModal({ userId }: { userId: string }) {
           <div className="grid gap-2">
              <Label>Descripción</Label>
              <textarea 
-                className="flex w-full rounded-md border border-slate-200 bg-transparent px-3 py-2 text-sm shadow-sm placeholder:text-slate-500 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-slate-950 disabled:cursor-not-allowed disabled:opacity-50"
-                rows={2}
+                className="flex w-full rounded-md border border-slate-200 bg-transparent px-3 py-2 text-sm shadow-sm placeholder:text-slate-500 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-slate-950 disabled:cursor-not-allowed disabled:opacity-50 resize-none"
+                rows={3}
                 value={descripcion} 
                 onChange={(e) => setDescripcion(e.target.value)} 
-                placeholder="Detalles adicionales, dosis, etc..." 
+                placeholder="Detalles adicionales, dosis, presentación..." 
              />
           </div>
 
@@ -133,11 +138,11 @@ export function AddProductModal({ userId }: { userId: string }) {
           <div className="h-px bg-slate-100 my-2"></div>
 
           <div className="grid grid-cols-3 gap-4">
-            <div className="grid gap-2"><Label>Costo ($)</Label><Input type="number" value={cost} onChange={(e) => setCost(e.target.value)} /></div>
+            <div className="grid gap-2"><Label>Costo ($) <span className="text-red-500">*</span></Label><Input type="number" value={cost} onChange={(e) => setCost(e.target.value)} /></div>
             <div className="grid gap-2"><Label>Margen (%)</Label><Input type="number" value={margin} onChange={(e) => setMargin(e.target.value)} /></div>
             <div className="grid gap-2">
                <Label className="text-blue-600 font-bold">Precio Final</Label>
-               <div className="h-10 flex items-center px-3 border rounded-md bg-slate-50 font-bold">
+               <div className="h-10 flex items-center px-3 border rounded-md bg-slate-50 font-bold text-slate-700">
                  ${cost && margin ? (parseFloat(cost) * (1 + parseFloat(margin)/100)).toFixed(2) : '0.00'}
                </div>
             </div>
@@ -150,7 +155,11 @@ export function AddProductModal({ userId }: { userId: string }) {
 
         </div>
         <Button onClick={handleSave} disabled={loading || !name || !cost} className="w-full bg-blue-600 hover:bg-blue-700 text-white">
-          {loading ? 'Guardando...' : 'Guardar Ficha'}
+          {loading ? (
+             <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Guardando...</>
+          ) : (
+             'Guardar Ficha'
+          )}
         </Button>
       </DialogContent>
     </Dialog>
